@@ -22,6 +22,7 @@ func main() {
 	QueryBorrowDetailRateLine(router)
 	QueryBorrowDetailRateModel(router)
 	UserBorrowDetail(router)
+
 	router.Run()
 }
 
