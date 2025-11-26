@@ -444,12 +444,12 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 		"(SELECT DATE_FORMAT( max(transaction_time), '%Y-%m-%d %H:%i' ) AS transaction_time,DATE_FORMAT(transaction_time,?) AS dateUnit,sum( assets ) AS amount,market_id FROM borrow_supply_detail " +
 		"WHERE supply_type =? AND caller_address =? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit,market_id) userMarket " +
 		"left join borrow b on b.market_id=userMarket.market_id " +
-		"left join coin_config cc on cc.coin_type=b.collateral_token_type"
+		"left join coin_config cc on cc.coin_type=b.collateral_token_type ORDER BY userMarket.dateUnit"
 	withdrawSql := "SELECT userMarket.*,cc.feed_id  from ( " +
 		"SELECT DATE_FORMAT(transaction_time,?) AS dateUnit,sum( assets ) AS amount, " +
 		"market_id,max(collateral_token_type) as collateral_token_type FROM borrow_withdraw_collateral " +
 		"WHERE caller_address =? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit, market_id)  userMarket " +
-		"LEFT JOIN coin_config cc ON cc.coin_type = userMarket.collateral_token_type	"
+		"LEFT JOIN coin_config cc ON cc.coin_type = userMarket.collateral_token_type ORDER BY userMarket.dateUnit"
 	log.Printf("YourTotalSupplyLineSql=%v\n", sql)
 	rs, err := con.Query(sql, dateFormat, 2, userAddress, start, end)
 	withdrawRs, withdrawErr := con.Query(withdrawSql, dateFormat, userAddress, start, end)
@@ -491,6 +491,8 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 	dateMaps := make(map[string]BorrowLine)
 	dateWithdrawMaps := make(map[string]BorrowLine)
 	coinPrice := PythPrice(feedIds)
+	supplyCollateralSum := 0.00
+	withdrawCollateralSum := 0.00
 	for _, um := range userMarketTotals {
 		var b BorrowLine
 		pythCoinFeedPrice := coinPrice[um.FeedId]
@@ -499,7 +501,8 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 		// log.Printf("floatAmountVal=%v\n", floatAmountVal)
 		// log.Printf("usdUnitPrice=%v\n", usdUnitPrice)
 		coinUsdAmount := floatAmountVal * usdUnitPrice
-		b.Amount = fmt.Sprintf("%.2f", coinUsdAmount)
+		supplyCollateralSum += coinUsdAmount
+		b.Amount = fmt.Sprintf("%.2f", supplyCollateralSum)
 		b.DateUnit = um.DateUnit
 		b.TransactionTime = um.TransactionTime
 		dateData, ok := dateMaps[um.DateUnit]
@@ -507,9 +510,9 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 			dateMaps[um.DateUnit] = b
 		} else {
 			// log.Printf("11111=%v\n", um.DateUnit)
-			usdAmount, _ := strconv.ParseFloat(dateData.Amount, 64)
-			usdAmount += coinUsdAmount
-			dateData.Amount = fmt.Sprintf("%.2f", usdAmount)
+			// usdAmount, _ := strconv.ParseFloat(dateData.Amount, 64)
+			// usdAmount += coinUsdAmount
+			dateData.Amount = fmt.Sprintf("%.2f", supplyCollateralSum)
 			dateMaps[um.DateUnit] = dateData
 		}
 	}
@@ -520,16 +523,17 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 		usdUnitPrice := FeedIdUsdUnitPrice(pythCoinFeedPrice)
 		floatAmountVal := CalculateCoinDecimalFloat(umw.Amount, umw.CoinType)
 		coinUsdAmount := floatAmountVal * usdUnitPrice
-		b.Amount = fmt.Sprintf("%.2f", coinUsdAmount)
+		withdrawCollateralSum += coinUsdAmount
+		b.Amount = fmt.Sprintf("%.2f", withdrawCollateralSum)
 		b.DateUnit = umw.DateUnit
 		b.TransactionTime = umw.TransactionTime
 		dateData, ok := dateWithdrawMaps[umw.DateUnit]
 		if !ok {
 			dateWithdrawMaps[umw.DateUnit] = b
 		} else {
-			usdAmount, _ := strconv.ParseFloat(dateData.Amount, 64)
-			usdAmount += coinUsdAmount
-			dateData.Amount = fmt.Sprintf("%.2f", usdAmount)
+			// usdAmount, _ := strconv.ParseFloat(dateData.Amount, 64)
+			// usdAmount += coinUsdAmount
+			dateData.Amount = fmt.Sprintf("%.2f", withdrawCollateralSum)
 			dateWithdrawMaps[umw.DateUnit] = dateData
 		}
 	}
