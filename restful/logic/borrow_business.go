@@ -82,13 +82,24 @@ type BorrowDetailVo struct {
 }
 
 type BorrowLine struct {
-	DateUnit string
-	Amount   string
+	TransactionTime string
+	DateUnit        string
+	Amount          string
+}
+
+type UserTotalCollateraModel struct {
+	TransactionTime string
+	DateUnit        string
+	Amount          string
+	MarketId        string
+	CoinType        string
+	FeedId          string
 }
 
 type BorrowRateLine struct {
-	DateUnit     string
-	InterestRate string
+	TransactionTime string
+	DateUnit        string
+	InterestRate    string
 }
 
 type UserMarket struct {
@@ -339,20 +350,19 @@ func QueryBorrowDetailRateLine(marketId string, timePeriodType int8, lineType in
 	if lineType == 2 {
 		condition = " and rate_type in('borrow','borrow_and_supply')"
 	}
-	sql := "SELECT DATE_FORMAT(rd.transaction_time,?) as dateUnit,rd.borrow_rate/10000000000000000 interestRate " +
+	sql := "SELECT DATE_FORMAT(rd.transaction_time, '%Y-%m-%d %H:%i') transaction_time,DATE_FORMAT(rd.transaction_time,?) as dateUnit,rd.borrow_rate/10000000000000000 interestRate " +
 		"FROM rate_detail rd INNER JOIN (" +
 		"SELECT DATE_FORMAT(transaction_time,?) AS timeGroup, MAX(transaction_time) AS last_time FROM rate_detail " +
 		"where market_id=? " + condition + " and transaction_time>=? and transaction_time<=? GROUP BY timeGroup " +
 		") t ON DATE_FORMAT(transaction_time,?) = t.timeGroup AND rd.transaction_time = t.last_time"
 
-	log.Printf("sql=%v", sql)
 	rs, err := con.Query(sql, dateFormat, dateFormat, marketId, start, end, dateFormat)
 	if err != nil {
 		return lines, fmt.Errorf(err.Error())
 	}
 	for rs.Next() {
 		var bl BorrowRateLine
-		rs.Scan(&bl.DateUnit, &bl.InterestRate)
+		rs.Scan(&bl.TransactionTime, &bl.DateUnit, &bl.InterestRate)
 		num, _ := strconv.ParseFloat(bl.InterestRate, 64)
 
 		log.Printf("num: %v", num)
@@ -368,18 +378,175 @@ func QueryBorrowDetailRateLine(marketId string, timePeriodType int8, lineType in
 }
 
 func QueryBorrowDetailLine(marketId string, timePeriodType int8, lineType int8) ([]BorrowLine, error) {
-	lines, err := BorrowSupplyDetailLine(false, "", marketId, timePeriodType, lineType)
-	if err != nil {
-		return nil, fmt.Errorf("BorrowSupplyDetailLine查询失败")
+	var lines []BorrowLine
+	dateFormat := "%m/%d %H"
+	now := time.Now()
+	end := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999, now.Location())
+	start := end.AddDate(0, 0, -7)
+	if timePeriodType == 2 {
+		dateFormat = "%m/%d"
+		start = end.AddDate(0, 0, -30)
 	}
+
+	if timePeriodType == 3 {
+		dateFormat = "%m/%d"
+		start = end.AddDate(0, 0, -90)
+	}
+
+	con := common.GetDbConnection()
+	sql := ""
+	var args []any
+	args = append(args, dateFormat)
+	args = append(args, marketId)
+	args = append(args, start)
+	args = append(args, end)
+	sql = "SELECT  DATE_FORMAT(max(transaction_time), '%Y-%m-%d %H:%i') transaction_time,DATE_FORMAT(transaction_time,?) as dateUnit,sum(assets) as amount from borrow_supply_detail  where market_id=? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit "
+	if lineType == 2 {
+		sql = "SELECT  DATE_FORMAT(max(transaction_time), '%Y-%m-%d %H:%i') transaction_time,DATE_FORMAT(transaction_time,?) as dateUnit,sum(assets) as amount from borrow_detail  where market_id=? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit "
+	}
+	rs, err := con.Query(sql, args...)
+	if err != nil {
+		log.Printf("sql执行报错：%v", err.Error())
+		return lines, nil
+	}
+	for rs.Next() {
+		var bl BorrowLine
+		scanErr := rs.Scan(&bl.TransactionTime, &bl.DateUnit, &bl.Amount)
+		num, _ := strconv.ParseFloat(bl.Amount, 64)
+		str1 := fmt.Sprintf("%.0f", num)
+		bl.Amount = str1
+		if scanErr != nil {
+			return nil, fmt.Errorf("scanErr失败")
+		}
+		lines = append(lines, bl)
+	}
+	defer con.Close()
 	return lines, nil
 }
 
 func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine, error) {
-	lines, err := BorrowSupplyDetailLine(true, userAddress, "", timePeriodType, 0)
-	if err != nil {
-		return nil, fmt.Errorf("BorrowSupplyDetailLine查询失败")
+	var lines []BorrowLine
+	dateFormat := "%m/%d %H"
+	now := time.Now()
+	end := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999, now.Location())
+	start := end.AddDate(0, 0, -7)
+	if timePeriodType == 2 {
+		dateFormat = "%m/%d"
+		start = end.AddDate(0, 0, -30)
 	}
+
+	if timePeriodType == 3 {
+		dateFormat = "%m/%d"
+		start = end.AddDate(0, 0, -90)
+	}
+	con := common.GetDbConnection()
+	sql := "SELECT userMarket.*,cc.coin_type,cc.feed_id from" +
+		"(SELECT DATE_FORMAT( max(transaction_time), '%Y-%m-%d %H:%i' ) AS transaction_time,DATE_FORMAT(transaction_time,?) AS dateUnit,sum( assets ) AS amount,market_id FROM borrow_supply_detail " +
+		"WHERE supply_type =? AND caller_address =? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit,market_id) userMarket " +
+		"left join borrow b on b.market_id=userMarket.market_id " +
+		"left join coin_config cc on cc.coin_type=b.collateral_token_type"
+	withdrawSql := "SELECT userMarket.*,cc.feed_id  from ( " +
+		"SELECT DATE_FORMAT(transaction_time,?) AS dateUnit,sum( assets ) AS amount, " +
+		"market_id,max(collateral_token_type) as collateral_token_type FROM borrow_withdraw_collateral " +
+		"WHERE caller_address =? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit, market_id)  userMarket " +
+		"LEFT JOIN coin_config cc ON cc.coin_type = userMarket.collateral_token_type	"
+	log.Printf("YourTotalSupplyLineSql=%v\n", sql)
+	rs, err := con.Query(sql, dateFormat, 2, userAddress, start, end)
+	withdrawRs, withdrawErr := con.Query(withdrawSql, dateFormat, userAddress, start, end)
+	if err != nil {
+		log.Printf("sql执行报错：%v", err.Error())
+		return lines, nil
+	}
+	if withdrawErr != nil {
+		log.Printf("withdrawSql执行报错：%v", withdrawErr.Error())
+		return lines, nil
+	}
+	var userMarketTotals []UserTotalCollateraModel
+	var userWithdrawTotals []UserTotalCollateraModel
+	feedIds := make(map[string]string)
+	for rs.Next() {
+		var u UserTotalCollateraModel
+		scanErr := rs.Scan(&u.TransactionTime, &u.DateUnit, &u.Amount, &u.MarketId, &u.CoinType, &u.FeedId)
+		num, _ := strconv.ParseFloat(u.Amount, 64)
+		str1 := fmt.Sprintf("%.0f", num)
+		u.Amount = str1
+		if scanErr != nil {
+			return nil, fmt.Errorf("scanErr失败")
+		}
+		feedIds[u.FeedId] = u.FeedId
+		userMarketTotals = append(userMarketTotals, u)
+	}
+	for withdrawRs.Next() {
+		var u UserTotalCollateraModel
+		scanErr := withdrawRs.Scan(&u.DateUnit, &u.Amount, &u.MarketId, &u.CoinType, &u.FeedId)
+		num, _ := strconv.ParseFloat(u.Amount, 64)
+		str1 := fmt.Sprintf("%.0f", num)
+		u.Amount = str1
+		if scanErr != nil {
+			return nil, fmt.Errorf("scanErr失败")
+		}
+		feedIds[u.FeedId] = u.FeedId
+		userWithdrawTotals = append(userWithdrawTotals, u)
+	}
+	dateMaps := make(map[string]BorrowLine)
+	dateWithdrawMaps := make(map[string]BorrowLine)
+	coinPrice := PythPrice(feedIds)
+	for _, um := range userMarketTotals {
+		var b BorrowLine
+		pythCoinFeedPrice := coinPrice[um.FeedId]
+		usdUnitPrice := FeedIdUsdUnitPrice(pythCoinFeedPrice)
+		floatAmountVal := CalculateCoinDecimalFloat(um.Amount, um.CoinType)
+		// log.Printf("floatAmountVal=%v\n", floatAmountVal)
+		// log.Printf("usdUnitPrice=%v\n", usdUnitPrice)
+		coinUsdAmount := floatAmountVal * usdUnitPrice
+		b.Amount = fmt.Sprintf("%.2f", coinUsdAmount)
+		b.DateUnit = um.DateUnit
+		b.TransactionTime = um.TransactionTime
+		dateData, ok := dateMaps[um.DateUnit]
+		if !ok {
+			dateMaps[um.DateUnit] = b
+		} else {
+			// log.Printf("11111=%v\n", um.DateUnit)
+			usdAmount, _ := strconv.ParseFloat(dateData.Amount, 64)
+			usdAmount += coinUsdAmount
+			dateData.Amount = fmt.Sprintf("%.2f", usdAmount)
+			dateMaps[um.DateUnit] = dateData
+		}
+	}
+
+	for _, umw := range userWithdrawTotals {
+		var b BorrowLine
+		pythCoinFeedPrice := coinPrice[umw.FeedId]
+		usdUnitPrice := FeedIdUsdUnitPrice(pythCoinFeedPrice)
+		floatAmountVal := CalculateCoinDecimalFloat(umw.Amount, umw.CoinType)
+		coinUsdAmount := floatAmountVal * usdUnitPrice
+		b.Amount = fmt.Sprintf("%.2f", coinUsdAmount)
+		b.DateUnit = umw.DateUnit
+		b.TransactionTime = umw.TransactionTime
+		dateData, ok := dateWithdrawMaps[umw.DateUnit]
+		if !ok {
+			dateWithdrawMaps[umw.DateUnit] = b
+		} else {
+			usdAmount, _ := strconv.ParseFloat(dateData.Amount, 64)
+			usdAmount += coinUsdAmount
+			dateData.Amount = fmt.Sprintf("%.2f", usdAmount)
+			dateWithdrawMaps[umw.DateUnit] = dateData
+		}
+	}
+	for _, bl := range dateMaps {
+		withdraw, ok := dateWithdrawMaps[bl.DateUnit]
+		if !ok {
+			log.Printf("%v时间没有取抵押\n", bl.DateUnit)
+		} else {
+			supplyCollateralVal, _ := strconv.ParseFloat(bl.Amount, 64)
+			withdrawCollateralVal, _ := strconv.ParseFloat(withdraw.Amount, 64)
+			val := supplyCollateralVal - withdrawCollateralVal
+			bl.Amount = fmt.Sprintf("%.2f", val)
+		}
+		lines = append(lines, bl)
+	}
+	// utils.PrettyPrint(dateMaps)
+	defer con.Close()
 	return lines, nil
 }
 
@@ -390,6 +557,10 @@ type TotalCollateralBorrowVo struct {
 	UserTotalSupply    string //用户market池子存入总额
 	UserTotalCollatera string //用户market池子抵押总额
 	UserTotalBorrow    string //用户所有market池子抵押总额
+	CollateraCoinType  string
+	CollateraFeedId    string
+	LoanCoinType       string
+	LoanFeedId         string
 	CoinType           string
 	FeedId             string
 }
@@ -406,6 +577,9 @@ func TotalCollateralBorrow(userAddress string) (TotalCollateralBorrowVo, error) 
 	userTotalSupplyUsd := 0.00
 
 	con := common.GetDbConnection()
+	// sql := "select b.total_supply_amount,b.total_supply_collateral_amount,b.total_loan_amount,b.collateral_token_type,b.loan_token_type,ccc.feed_id as collateral_feed_id,ccl.feed_id as loan_feed_id from borrow b" +
+	// 	"left join coin_config ccc on ccc.coin_type=b.collateral_token_type" +
+	// 	"left join coin_config ccl on ccl.coin_type=b.loan_token_type "
 	collateralBaseSql := "SELECT market_id,IFNULL(SUM(assets), 0) AS total_collateral_amount,SUM(CASE WHEN caller_address = ? THEN assets ELSE 0 " +
 		"END) AS user_total_collateral_amount FROM borrow_supply_detail WHERE supply_type =? GROUP BY market_id"
 	collateralSql := "select SUM(total_collateral_amount) total_collateral_amount," +
@@ -419,10 +593,15 @@ func TotalCollateralBorrow(userAddress string) (TotalCollateralBorrowVo, error) 
 		"left join borrow b on b.market_id=totalMarket.market_id " +
 		"left join coin_config cc on cc.coin_type=b.loan_token_type " +
 		"GROUP BY coin_type,feed_id"
-	fmt.Printf("collateralCoinSql=%v", collateralCoinSql)
+
 	collateralRs, collateralErr := con.Query(collateralCoinSql, userAddress, 2)
 	supplyRs, supplyErr := con.Query(supplyCoinSql, userAddress, 1)
 	borrowRs, borrowErr := con.Query(borrowSql, userAddress)
+	// rs, err := con.Query(sql)
+	// if err != nil {
+	// 	log.Printf("market查询报错：%v", err.Error())
+	// 	return vo, nil
+	// }
 	if supplyErr != nil {
 		log.Printf("supply查询报错：%v", supplyErr.Error())
 		return vo, nil
@@ -439,6 +618,19 @@ func TotalCollateralBorrow(userAddress string) (TotalCollateralBorrowVo, error) 
 	var borrowVo []TotalCollateralBorrowVo
 	var collateralVo []TotalCollateralBorrowVo
 	var supplyVo []TotalCollateralBorrowVo
+
+	// for rs.Next() {
+	// 	var m TotalCollateralBorrowVo
+	// 	err := rs.Scan(&m.TotalSupply, &m.TotalCollatera, &m.TotalBorrow, &borrow.FeedId)
+	// 	borrow.TotalBorrow = CalculateCoinDecimal(borrow.TotalBorrow, borrow.CoinType)
+	// 	borrow.UserTotalBorrow = CalculateCoinDecimal(borrow.UserTotalBorrow, borrow.CoinType)
+	// 	feedIds[borrow.FeedId] = borrow.FeedId
+	// 	borrowVo = append(borrowVo, borrow)
+	// 	if err != nil {
+	// 		log.Printf("borrow赋值报错：%v", err.Error())
+	// 		return vo, nil
+	// 	}
+	// }
 
 	for borrowRs.Next() {
 		var borrow TotalCollateralBorrowVo
@@ -483,7 +675,6 @@ func TotalCollateralBorrow(userAddress string) (TotalCollateralBorrowVo, error) 
 	for _, collateralVal := range collateralVo {
 		pythCoinFeedPrice := coinPrice[collateralVal.FeedId]
 		usdUnitPrice := FeedIdUsdUnitPrice(pythCoinFeedPrice)
-		log.Printf("usdUnitPrice=%d\n", usdUnitPrice)
 
 		floatTotalCollateraVal, _ := strconv.ParseFloat(collateralVal.TotalCollatera, 64)
 		floatUserTotalCollateraVal, _ := strconv.ParseFloat(collateralVal.UserTotalCollatera, 64)
@@ -555,6 +746,13 @@ func CalculateCoinDecimal(val string, coinType string) string {
 	return fmt.Sprintf("%."+fmt.Sprintf("%d", coinDecimal)+"f", v)
 }
 
+func CalculateCoinDecimalFloat(val string, coinType string) float64 {
+	loanCoinType := GetStringDoubleSemicolonLast(coinType)
+	coinDecimal := GetCoinDecimal(loanCoinType)
+	floatVal, _ := strconv.ParseFloat(ScientificComputingConvStr(val), 64)
+	return floatVal / math.Pow(10, float64(coinDecimal))
+}
+
 func ScientificComputingConvStr(val string) string {
 	num, _ := strconv.ParseFloat(val, 64)
 	return fmt.Sprintf("%.0f", num)
@@ -583,12 +781,12 @@ func BorrowSupplyDetailLine(isUser bool, userAddress string, marketId string, ti
 	if isUser {
 		args = append(args, 2)
 		args = append(args, userAddress)
-		sql = "SELECT  DATE_FORMAT(transaction_time,?) as dateUnit,sum(assets) as amount from borrow_supply_detail  where supply_type=? and caller_address=?  and transaction_time>=? and transaction_time<=? GROUP BY dateUnit "
+		sql = "SELECT  DATE_FORMAT(max(transaction_time), '%Y-%m-%d %H:%i') transaction_time,DATE_FORMAT(transaction_time,?) as dateUnit,sum(assets) as amount from borrow_supply_detail  where supply_type=? and caller_address=?  and transaction_time>=? and transaction_time<=? GROUP BY dateUnit "
 	} else {
 		args = append(args, marketId)
-		sql = "SELECT  DATE_FORMAT(transaction_time,?) as dateUnit,sum(assets) as amount from borrow_supply_detail  where market_id=? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit "
+		sql = "SELECT  DATE_FORMAT(max(transaction_time), '%Y-%m-%d %H:%i') transaction_time,DATE_FORMAT(transaction_time,?) as dateUnit,sum(assets) as amount from borrow_supply_detail  where market_id=? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit "
 		if lineType == 2 {
-			sql = "SELECT  DATE_FORMAT(transaction_time,?) as dateUnit,sum(assets) as amount from borrow_detail  where market_id=? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit "
+			sql = "SELECT  DATE_FORMAT(max(transaction_time), '%Y-%m-%d %H:%i') transaction_time,DATE_FORMAT(transaction_time,?) as dateUnit,sum(assets) as amount from borrow_detail  where market_id=? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit "
 		}
 	}
 	args = append(args, start)
@@ -601,7 +799,7 @@ func BorrowSupplyDetailLine(isUser bool, userAddress string, marketId string, ti
 	}
 	for rs.Next() {
 		var bl BorrowLine
-		scanErr := rs.Scan(&bl.DateUnit, &bl.Amount)
+		scanErr := rs.Scan(&bl.TransactionTime, &bl.DateUnit, &bl.Amount)
 		num, _ := strconv.ParseFloat(bl.Amount, 64)
 		str1 := fmt.Sprintf("%.0f", num)
 		bl.Amount = str1
@@ -650,15 +848,15 @@ func QueryUserBorrowDetail(userAddress string, marketId string) (UserBorrowDetal
 }
 
 func QueryBorrowVaultList() ([]BorrowModel, error) {
+	var borrows []BorrowModel
 	con := common.GetDbConnection()
 	queryRs, queryErr := con.Query("select id,market_id,market_title,market_log,total_supply_amount,total_supply_collateral_amount,total_loan_amount,loan_token_type,collateral_token_type,fee,lltv,ltv,oracle_id,supply_rate,borrow_rate,liquidity,liquidity_proportion from borrow ")
 	if queryErr != nil {
+		log.Printf("QueryBorrowVaultList=11111%v\n", queryErr.Error())
 		return nil, fmt.Errorf(queryErr.Error())
 	}
-	defer queryRs.Close() // 延迟关闭queryRs，确保资源释放
-	var borrows []BorrowModel
+	// defer queryRs.Close() // 延迟关闭queryRs，确保资源释放
 	coinMap := GetCoinMap()
-
 	for queryRs.Next() {
 		var b BorrowModel
 		err := queryRs.Scan(
@@ -719,7 +917,6 @@ func GetStringDoubleSemicolonLast(val string) string {
 }
 
 func PythPrice(feedIds map[string]string) map[string]PythCoinFeedPrice {
-
 	var feedPrices = make(map[string]PythCoinFeedPrice)
 	params := url.Values{}
 	for _, v := range feedIds {
@@ -731,23 +928,26 @@ func PythPrice(feedIds map[string]string) map[string]PythCoinFeedPrice {
 	resp, err := http.Get(fullURL)
 	if err != nil {
 		// 处理请求发送失败（如网络错误、URL 非法等）
-		log.Fatalf("请求发送失败：%v", err)
+		log.Printf("PythPrice-请求发送失败：%v\n", err)
+		return feedPrices
 	}
 	// 关键：必须关闭响应体（避免资源泄漏），使用 defer 确保函数退出时执行
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			log.Printf("关闭响应体失败：%v", err)
+			log.Printf("PythPrice-关闭响应体失败：%v\n", err)
 		}
 	}()
 
 	// 检查响应状态码（200 OK 表示请求成功）
 	if resp.StatusCode != http.StatusOK {
-		log.Fatalf("请求失败，状态码：%d", resp.StatusCode)
+		log.Printf("PythPrice-请求失败，状态码：%d\n", resp.StatusCode)
+		return feedPrices
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body) // 若 Go 版本 ≥1.16，替换为 io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalf("读取响应体失败：%v", err)
+		log.Printf("PythPrice-读取响应体失败：%v\n", err)
+		return feedPrices
 	}
 
 	// 转换字节为字符串，打印结果
@@ -755,23 +955,28 @@ func PythPrice(feedIds map[string]string) map[string]PythCoinFeedPrice {
 	var jsonMap map[string]interface{}
 	jsonErr := json.Unmarshal(bodyBytes, &jsonMap)
 	if jsonErr != nil {
-		log.Fatalf("JSON 解析失败：%v", err)
+		log.Printf("PythPrice-JSON 解析失败：%v\n", err)
+		return feedPrices
 	}
 
 	parseds, ok := jsonMap["parsed"].([]interface{})
 	if !ok {
-		log.Fatalf("parsed 不是数组类型")
+		log.Printf("PythPrice-parsed 不是数组类型\n")
+		return feedPrices
 	}
 
 	for _, parsed := range parseds {
 		var feedPrice PythCoinFeedPrice
 		parsedMap, ok := parsed.(map[string]interface{})
 		if !ok {
-			log.Fatalf("parsedMap 不是map")
+			log.Printf("PythPrice-parsedMap 不是map\n")
+			return feedPrices
+			// log.Fatalf()
 		}
 		priceMap, ok2 := parsedMap["price"].(map[string]interface{})
 		if !ok2 {
-			log.Fatalf("priceMap 不是map")
+			log.Printf("PythPrice-priceMap2 不是map\n")
+			return feedPrices
 		}
 		feedPrice.FeedId = "0x" + parsedMap["id"].(string)
 		feedPrice.Price = priceMap["price"].(string)

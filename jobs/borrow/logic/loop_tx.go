@@ -12,7 +12,6 @@ import (
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
 	"github.com/block-vision/sui-go-sdk/models"
 	"github.com/block-vision/sui-go-sdk/sui"
-	"github.com/block-vision/sui-go-sdk/utils"
 )
 
 const (
@@ -21,22 +20,24 @@ const (
 	// PackageId = "0x2edaecbb7006874ca2325cb64c5e270c75ddaa3ff6e538cef01f1776a44849ef" //11-18
 	// PackageId = "0xb12af66b0efad99e73caa6a45abd899617514edaebbbcb0da323adee44d19960" // 11-20 10:00
 	// PackageId      = "0x22e06514fa36ac6fa71d52e3af0781c6a90fd9e8819b3d03a175c8539bce7e27" // 11-20 16:15
-	PackageId = "0x2174ea522ea7eec389d64cf9b5d4471fa4015b2c740030c1a34caffe2f21f88c"
-	// PackageIdDev   = "0xea26bb0b34071bace5485272802d0b3dc158aca7ca729630d94130a56c092b46"
-	// HEarnObjectId  = "0x280ede46d7c4f053a0b5a87c49857499b7a89f38720ad63b1650e0f1d85ef0f4"
-	PackageIdDev   = "0x2174ea522ea7eec389d64cf9b5d4471fa4015b2c740030c1a34caffe2f21f88c"
+	// PackageId = "0x2174ea522ea7eec389d64cf9b5d4471fa4015b2c740030c1a34caffe2f21f88c" //第一版
+	// PackageIdDev   = "0x2174ea522ea7eec389d64cf9b5d4471fa4015b2c740030c1a34caffe2f21f88c"
+	// PackageId      = "0xad7e351cd6590ee2f092903e747e6c3ed5d830a641183357bab4b5d24a7222b3" //11-25
+	PackageId      = "0x42e82a2b26d93d2ac348d11196b8b9ad4e391c1cc1590523e043856b91924371" //11-26
+	PackageIdDev   = "0xad7e351cd6590ee2f092903e747e6c3ed5d830a641183357bab4b5d24a7222b3"
 	HEarnObjectId  = "0xbc5da89ed860e45d58a724921175224338f452e0896a5565d0564e2fb1b1ed85"
 	SuiUserAddress = "0x438796b44e606f8768c925534ebb87be9ded13cc51a6ddd955e6e40ab85db6f5"
 	SuiEnv         = "https://sui-testnet-endpoint.blockvision.org"
 )
 
 const (
-	CreateMarketEvent     = "::events::CreateMarketEvent"
-	SupplyEvent           = "::events::SupplyEvent"
-	SupplyCollateralEvent = "::events::SupplyCollateralEvent"
-	BorrowEvent           = "::events::BorrowEvent"
-	RepayEvent            = "::events::RepayEvent"
-	AccrueInterestEvent   = "::events::AccrueInterestEvent"
+	CreateMarketEvent       = "::events::CreateMarketEvent"       //创建Market
+	SupplyEvent             = "::events::SupplyEvent"             //存数量
+	SupplyCollateralEvent   = "::events::SupplyCollateralEvent"   //存抵押
+	BorrowEvent             = "::events::BorrowEvent"             //借数量
+	RepayEvent              = "::events::RepayEvent"              //还数量
+	WithdrawCollateralEvent = "::events::WithdrawCollateralEvent" //取抵押
+	AccrueInterestEvent     = "::events::AccrueInterestEvent"
 )
 
 func RpcApiRequest() {
@@ -78,6 +79,8 @@ func RpcApiRequest() {
 				InsertBorrowDetali(event.ParsedJson, digest, transactionTime)
 			case RepayEvent: //还
 				InsertBorrowRepayDetali(event.ParsedJson, digest, transactionTime)
+			case WithdrawCollateralEvent: // 取抵押
+				InsertBorroWithdrawCollateral(event.ParsedJson, digest, transactionTime)
 			case AccrueInterestEvent: //计利息
 				InsertRateDetali(event.ParsedJson, transactions, digest, transactionTime)
 			}
@@ -149,6 +152,41 @@ func InsertRateDetali(parsedJson map[string]interface{}, transactions []interfac
 
 }
 
+func InsertBorroWithdrawCollateral(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
+	market_id := parsedJson["market_id"].(string)
+	caller_address := parsedJson["caller"].(string)
+	on_behalf_address := parsedJson["on_behalf"].(string)
+	receiver_address := parsedJson["receiver"].(string)
+	assets := parsedJson["assets"].(string)
+	collateralType := parsedJson["collateral_token_type"].(map[string]interface{})["name"].(string)
+	loanlType := parsedJson["loan_token_type"].(map[string]interface{})["name"].(string)
+	convRs, convErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
+	if convErr != nil {
+		log.Printf("转换失败：%v\n", convErr)
+	}
+	transactionTime := time.UnixMilli(convRs)
+	con := common.GetDbConnection()
+	queryRs, queryErr := con.Query("select * from borrow_repay_detail where digest=?", digest)
+	if queryErr != nil {
+		log.Printf("borrow查询 digest失败: %v", queryErr)
+		return
+	}
+	if queryRs.Next() {
+		fmt.Printf("RepayEvent digest exist :%v\n", digest)
+		defer queryRs.Close() // 务必关闭结果集
+		return
+	}
+	sql := "insert into borrow_withdraw_collateral(market_id,caller_address,on_behalf_address,receiver,assets,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
+	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, receiver_address, assets, collateralType, loanlType, digest, transactionTimeUnix, transactionTime)
+	if err != nil {
+		log.Printf("borrow_withdraw_collateral新增失败: %v", err)
+		return
+	}
+	lastInsertID, _ := result.LastInsertId()
+	log.Printf("borrow_withdraw_collateral新增id：=%v", lastInsertID)
+	defer con.Close() // 程序退出时关闭数据库连接
+}
+
 func InsertBorrowRepayDetali(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
 	market_id := parsedJson["market_id"].(string)
 	caller_address := parsedJson["caller"].(string)
@@ -216,21 +254,21 @@ func InsertBorrowDetali(parsedJson map[string]interface{}, digest string, transa
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("borrow_detail新增id：=%v", lastInsertID)
 
-	borrowRs, borrowErr := con.Query("select * from borrow where market_id=?", market_id)
-	if borrowErr != nil {
-		log.Printf("borrow查询market_id失败: %v", borrowErr)
-		return
-	}
-	if borrowRs.Next() {
-		log.Printf("borrow-market_id查询1")
-		upRs, upErr := con.Exec("update borrow set total_loan_amount=total_loan_amount+? where market_id=?", assets, market_id)
-		if upErr != nil {
-			log.Printf("borrow 更新失败: %v", upErr)
-			return
-		}
-		upRow, _ := upRs.RowsAffected()
-		log.Printf("borrow 更新条数: %v", upRow)
-	}
+	// borrowRs, borrowErr := con.Query("select * from borrow where market_id=?", market_id)
+	// if borrowErr != nil {
+	// 	log.Printf("borrow查询market_id失败: %v", borrowErr)
+	// 	return
+	// }
+	// if borrowRs.Next() {
+	// 	log.Printf("borrow-market_id查询1")
+	// 	upRs, upErr := con.Exec("update borrow set total_loan_amount=total_loan_amount+? where market_id=?", assets, market_id)
+	// 	if upErr != nil {
+	// 		log.Printf("borrow 更新失败: %v", upErr)
+	// 		return
+	// 	}
+	// 	upRow, _ := upRs.RowsAffected()
+	// 	log.Printf("borrow 更新条数: %v", upRow)
+	// }
 	defer con.Close() // 程序退出时关闭数据库连接
 }
 
@@ -265,20 +303,20 @@ func InsertBorrowSupplyDetaliCollateral(parsedJson map[string]interface{}, diges
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("borrow_supply_detail_collateral新增id：=%v", lastInsertID)
 
-	borrowRs, borrowErr := con.Query("select * from borrow where market_id=?", market_id)
-	if borrowErr != nil {
-		log.Printf("borrow查询market_id失败: %v", borrowErr)
-		return
-	}
-	if borrowRs.Next() {
-		upRs, upErr := con.Exec("update borrow set total_supply_collateral_amount=total_supply_collateral_amount+? where market_id=?", assets, market_id)
-		if upErr != nil {
-			log.Printf("borrow 更新失败: %v", upErr)
-			return
-		}
-		upRow, _ := upRs.RowsAffected()
-		log.Printf("borrow 更新条数: %v", upRow)
-	}
+	// borrowRs, borrowErr := con.Query("select * from borrow where market_id=?", market_id)
+	// if borrowErr != nil {
+	// 	log.Printf("borrow查询market_id失败: %v", borrowErr)
+	// 	return
+	// }
+	// if borrowRs.Next() {
+	// 	upRs, upErr := con.Exec("update borrow set total_supply_collateral_amount=total_supply_collateral_amount+? where market_id=?", assets, market_id)
+	// 	if upErr != nil {
+	// 		log.Printf("borrow 更新失败: %v", upErr)
+	// 		return
+	// 	}
+	// 	upRow, _ := upRs.RowsAffected()
+	// 	log.Printf("borrow 更新条数: %v", upRow)
+	// }
 	defer con.Close() // 程序退出时关闭数据库连接
 }
 func InsertBorrowSupplyDetali(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
@@ -314,20 +352,20 @@ func InsertBorrowSupplyDetali(parsedJson map[string]interface{}, digest string, 
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("borrow_supply_detail新增id：=%v", lastInsertID)
 
-	borrowRs, borrowErr := con.Query("select * from borrow where market_id=?", market_id)
-	if borrowErr != nil {
-		log.Printf("borrow查询market_id失败: %v", borrowErr)
-		return
-	}
-	if borrowRs.Next() {
-		upRs, upErr := con.Exec("update borrow set total_supply_amount=total_supply_amount+? where market_id=?", assets, market_id)
-		if upErr != nil {
-			log.Printf("borrow 更新失败: %v", upErr)
-			return
-		}
-		upRow, _ := upRs.RowsAffected()
-		log.Printf("borrow 更新条数: %v", upRow)
-	}
+	// borrowRs, borrowErr := con.Query("select * from borrow where market_id=?", market_id)
+	// if borrowErr != nil {
+	// 	log.Printf("borrow查询market_id失败: %v", borrowErr)
+	// 	return
+	// }
+	// if borrowRs.Next() {
+	// 	upRs, upErr := con.Exec("update borrow set total_supply_amount=total_supply_amount+? where market_id=?", assets, market_id)
+	// 	if upErr != nil {
+	// 		log.Printf("borrow 更新失败: %v", upErr)
+	// 		return
+	// 	}
+	// 	upRow, _ := upRs.RowsAffected()
+	// 	log.Printf("borrow 更新条数: %v", upRow)
+	// }
 	defer con.Close() // 程序退出时关闭数据库连接
 }
 
@@ -341,7 +379,6 @@ func InsertBorrow(parsedJson map[string]interface{}, digest string, transactionT
 	oracleId := parsedJson["oracle_id"].(string)
 	titleBcs := parsedJson["title"].([]any)
 	titleBcsByte, _ := anyToBytes(titleBcs)
-	utils.PrettyPrint(titleBcsByte)
 	deserializer := bcs.NewDeserializer(titleBcsByte)
 	title := deserializer.ReadString()
 	// title := ""
@@ -349,8 +386,6 @@ func InsertBorrow(parsedJson map[string]interface{}, digest string, transactionT
 	quoteTokenDecimals := parsedJson["quote_token_decimals"].(string)
 
 	log.Printf("title=%v", title)
-	log.Printf("baseTokenDecimals=%v", baseTokenDecimals)
-	log.Printf("quoteTokenDecimals=%v", quoteTokenDecimals)
 
 	con := common.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from borrow where digest=?", digest)

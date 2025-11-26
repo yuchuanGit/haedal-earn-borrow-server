@@ -82,12 +82,18 @@ func UpdateBorrowRate(marketId uint64, con *sql.DB) {
 		liquidity := totalSupplyAssets - totalBorrowAssets
 		supplyRate = supplyRate / baseUnit
 		borrowRate = borrowRate / baseUnit
-		supplyRateStr := fmt.Sprintf("%.16f", supplyRate) + "%"
-		borrowRateStr := fmt.Sprintf("%.16f", borrowRate) + "%"
+		supplyRateStr := fmt.Sprintf("%.2f", supplyRate) + "%"
+		borrowRateStr := fmt.Sprintf("%.2f", borrowRate) + "%"
+		if supplyRate < 0.01 {
+			supplyRateStr = "<0.01%"
+		}
+		if borrowRate < 0.01 {
+			borrowRateStr = "<0.01%"
+		}
 		liquidityProportionStr := fmt.Sprintf("%.16f", liquidityProportion)
 		title := marketInfo[len(marketInfo)-1]
-		upSql := "update borrow set supply_rate=?,borrow_rate=?,liquidity=?,liquidity_proportion=?,market_title=?,scheduled_execution=1 where market_id=?"
-		_, upErr := con.Exec(upSql, supplyRateStr, borrowRateStr, liquidity, liquidityProportionStr, title, marketId)
+		upSql := "update borrow set total_supply_amount=?,total_loan_amount=?,supply_rate=?,borrow_rate=?,liquidity=?,liquidity_proportion=?,market_title=?,scheduled_execution=1 where market_id=?"
+		_, upErr := con.Exec(upSql, totalSupplyAssets, totalBorrowAssets, supplyRateStr, borrowRateStr, liquidity, liquidityProportionStr, title, marketId)
 		if upErr != nil {
 			fmt.Printf("UpdateMarketRate update rate失败：%v\n", upErr.Error())
 		}
@@ -156,7 +162,7 @@ func DevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx transac
 	}
 	var resultData []string
 	// log.Printf("aaaaa\n")
-	// utils.PrettyPrint(devRs)
+
 	// log.Printf("bbbbb\n")
 	for _, returnValue := range moveCallReturn[0].ReturnValues {
 		bcsBytes, _ := anyToBytes(returnValue.([]any)[0])
