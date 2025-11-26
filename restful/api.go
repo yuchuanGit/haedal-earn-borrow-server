@@ -23,7 +23,7 @@ func main() {
 	QueryBorrowDetailRateModel(router)
 	UserBorrowDetail(router)
 
-	router.Run()
+	router.Run(":9101")
 }
 
 func Recover() gin.HandlerFunc {
