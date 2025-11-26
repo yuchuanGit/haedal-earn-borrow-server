@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"haedal-earn-borrow-server/common"
-	"strconv"
 
 	"log"
 
@@ -67,14 +66,21 @@ func UpdateMarketRate() {
 }
 
 func UpdateBorrowRate(marketId uint64, con *sql.DB) {
-	marketInfo := GetMarketInfo(marketId)
+	marketInfos := GetMarketInfo(marketId)
 	var baseUnit float64 = 1e16
 	var maxUtilization float64 = 1
-	if len(marketInfo) > 0 {
-		supplyRate, _ := strconv.ParseFloat(marketInfo[2], 64)        //存利率
-		borrowRate, _ := strconv.ParseFloat(marketInfo[3], 64)        //借利率
-		totalSupplyAssets, _ := strconv.ParseFloat(marketInfo[8], 64) //总存入数量
-		totalBorrowAssets, _ := strconv.ParseFloat(marketInfo[9], 64) //总借出数量
+	if len(marketInfos) > 0 {
+		marketInfo := marketInfos[0]
+
+		// supplyRate, _ := strconv.ParseFloat(marketInfo[2], 64)        //存利率
+		// borrowRate, _ := strconv.ParseFloat(marketInfo[3], 64)        //借利率
+		// totalSupplyAssets, _ := strconv.ParseFloat(marketInfo[8], 64) //总存入数量
+		// totalBorrowAssets, _ := strconv.ParseFloat(marketInfo[9], 64) //总借出数量
+		supplyRate := float64(marketInfo.SupplyRate)                       //存利率
+		borrowRate := float64(marketInfo.BorrowRate)                       //借利率
+		totalSupplyAssets := float64(marketInfo.TotalSupplyAssets)         //总存入数量
+		totalCollateralAssets := float64(marketInfo.TotalCollateralAssets) //总抵押
+		totalBorrowAssets := float64(marketInfo.TotalBorrowAssets)         //总借出数量
 		liquidityProportion := 0.00
 		if totalBorrowAssets > 0 {
 			liquidityProportion = (totalBorrowAssets / (totalSupplyAssets * maxUtilization)) * 100
@@ -91,17 +97,17 @@ func UpdateBorrowRate(marketId uint64, con *sql.DB) {
 			borrowRateStr = "<0.01%"
 		}
 		liquidityProportionStr := fmt.Sprintf("%.16f", liquidityProportion)
-		title := marketInfo[len(marketInfo)-1]
-		upSql := "update borrow set total_supply_amount=?,total_loan_amount=?,supply_rate=?,borrow_rate=?,liquidity=?,liquidity_proportion=?,market_title=?,scheduled_execution=1 where market_id=?"
-		_, upErr := con.Exec(upSql, totalSupplyAssets, totalBorrowAssets, supplyRateStr, borrowRateStr, liquidity, liquidityProportionStr, title, marketId)
+		title := "HEARN-USDC-SUI"
+		upSql := "update borrow set total_supply_amount=?,total_supply_collateral_amount=?,total_loan_amount=?,supply_rate=?,borrow_rate=?,liquidity=?,liquidity_proportion=?,market_title=?,scheduled_execution=1 where market_id=?"
+		_, upErr := con.Exec(upSql, totalSupplyAssets, totalCollateralAssets, totalBorrowAssets, supplyRateStr, borrowRateStr, liquidity, liquidityProportionStr, title, marketId)
 		if upErr != nil {
 			fmt.Printf("UpdateMarketRate update rate失败：%v\n", upErr.Error())
 		}
 	}
 }
 
-func GetMarketInfo(marketId uint64) []string {
-	var initVal []string
+func GetMarketInfo(marketId uint64) []MarketInfo {
+	var initVal []MarketInfo
 	cli := sui.NewSuiClient(SuiEnv)
 	ctx := context.Background()
 	tx := transaction.NewTransaction()
@@ -116,8 +122,8 @@ func GetMarketInfo(marketId uint64) []string {
 	return DevInspectTransactionBlock(cli, ctx, *tx, moduleName, funcName, arguments)
 }
 
-func DevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, moduleName string, funcName string, arguments []transaction.Argument) []string {
-	var initVal []string
+func DevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, moduleName string, funcName string, arguments []transaction.Argument) []MarketInfo {
+	var initVal []MarketInfo
 	tx.MoveCall(
 		models.SuiAddress(PackageIdDev),
 		moduleName,
@@ -160,18 +166,72 @@ func DevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx transac
 		fmt.Println("moveCallReturn convert json fail ", err3.Error())
 		return initVal
 	}
-	var resultData []string
-	// log.Printf("aaaaa\n")
-
-	// log.Printf("bbbbb\n")
+	var resultData []MarketInfo
 	for _, returnValue := range moveCallReturn[0].ReturnValues {
+		var market MarketInfo
 		bcsBytes, _ := anyToBytes(returnValue.([]any)[0])
-		dataType := returnValue.([]any)[1]
-		val := bcsTypeDistinctionResult(dataType, bcsBytes)
-		resultData = append(resultData, val)
+		deserializer := bcs.NewDeserializer(bcsBytes)
+		if err := market.UnmarshalBCS(deserializer); err != nil {
+			panic(fmt.Sprintf("解析 MarketInfo 失败：%v", err))
+		}
+		resultData = append(resultData, market)
+		// bcsBytes, _ := anyToBytes(returnValue.([]any)[0])
+		// dataType := returnValue.([]any)[1]
+		// val := bcsTypeDistinctionResult(dataType, bcsBytes)
+		// resultData = append(resultData, val)
 	}
 	return resultData
 }
+
+func (m *MarketInfo) UnmarshalBCS(d *bcs.Deserializer) error {
+	// 按 Move 字段顺序解析
+	// marketId := d.U64() // 解析 u128
+	m.MarketId = d.U64()
+	m.SupplyCoinType = d.ReadString()
+	m.CollateralCoinType = d.ReadString()
+	m.Ltv = d.U64()
+	m.Lltv = d.U64()
+	m.LiquidationThreshold = d.U64()
+	m.TotalSupplyAssets = d.U64()
+	m.TotalBorrowAssets = d.U64()
+	m.TotalCollateralAssets = d.U64()
+	m.Fee = d.U64()
+	m.FlashloanFee = d.U64()
+	m.SupplyRate = d.U64()
+	m.BorrowRate = d.U64()
+	m.UtilizationRate = d.U64()
+	m.MarketPaused = d.Bool()
+	m.GlobalPaused = d.Bool()
+	// titleByte := d.ReadBytes()
+
+	// deserializer := bcs.NewDeserializer(titleByte)
+	// log.Printf("title=%b", )
+
+	m.Title = d.ReadString()
+	return nil
+}
+
+type MarketInfo struct {
+	MarketId              uint64 `bcs:"market_id"`
+	SupplyCoinType        string `bcs:"supply_coin_type"`
+	CollateralCoinType    string `bcs:"collateral_coin_type"`
+	Ltv                   uint64 `bcs:"ltv"`
+	Lltv                  uint64 `bcs:"lltv"`                    // Liquidation Loan-to-Value in WAD
+	LiquidationThreshold  uint64 `bcs:"liquidation_threshold"`   // Liquidation threshold (same as LLTV)
+	TotalSupplyAssets     uint64 `bcs:"total_supply_assets"`     // Total supplied assets
+	TotalBorrowAssets     uint64 `bcs:"total_borrow_assets"`     // Total borrowed assets
+	TotalCollateralAssets uint64 `bcs:"total_collateral_assets"` // Total collateral assets
+	Fee                   uint64 `bcs:"fee"`                     // Protocol fee in WAD
+	FlashloanFee          uint64 `bcs:"flashloan_fee"`           // Flash loan fee in WAD
+	SupplyRate            uint64 `bcs:"supply_rate"`             // Current supply rate (WAD precision)
+	BorrowRate            uint64 `bcs:"borrow_rate"`             // Current borrow rate (WAD precision)
+	UtilizationRate       uint64 `bcs:"utilization_rate"`        // Market utilization rate (WAD precision, total_borrow / total_supply)
+	MarketPaused          bool   `bcs:"market_paused"`           // Market-level pause flag
+	GlobalPaused          bool   `bcs:"global_paused"`           // Global pause flag
+	Title                 string `bcs:"title"`                   // Human readable market title
+}
+
+// 实现 bcs.Marshaler 接口（可选，默认通过反射）
 
 func GetMarketInfoParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, marketId uint64) ([]transaction.Argument, error) {
 	hearnSharedObject, err := GetSharedObjectRef(ctx, cli, HEarnObjectId, true)

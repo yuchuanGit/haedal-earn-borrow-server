@@ -450,7 +450,7 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 		"market_id,max(collateral_token_type) as collateral_token_type FROM borrow_withdraw_collateral " +
 		"WHERE caller_address =? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit, market_id)  userMarket " +
 		"LEFT JOIN coin_config cc ON cc.coin_type = userMarket.collateral_token_type ORDER BY userMarket.dateUnit"
-	log.Printf("YourTotalSupplyLineSql=%v\n", sql)
+	// log.Printf("YourTotalSupplyLineSql=%v\n", sql)
 	rs, err := con.Query(sql, dateFormat, 2, userAddress, start, end)
 	withdrawRs, withdrawErr := con.Query(withdrawSql, dateFormat, userAddress, start, end)
 	if err != nil {

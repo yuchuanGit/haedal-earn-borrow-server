@@ -17,7 +17,7 @@ func startJob() {
 	// 创建一个支持秒级的 cron 实例（默认不支持秒，需加 WithSeconds() 选项）
 	c := cron.New(cron.WithSeconds())
 
-	// 添加定时任务（每 10 秒执行一次）
+	// 添加定时任务（每 1 分钟执行一次）
 	_, err := c.AddFunc("0 */1 * * * *", func() {
 		fmt.Println("cron 任务执行：", time.Now().Format("15:04:05.000"))
 		logic.UpdateMarketRate()
