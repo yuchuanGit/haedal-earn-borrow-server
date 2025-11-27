@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"haedal-earn-borrow-server/common"
+	"math/big"
 
 	"log"
 
@@ -67,22 +68,23 @@ func UpdateMarketRate() {
 	// }
 }
 
+func bigIntToFloat64(bi big.Int) (float64, bool) {
+	bf := new(big.Float).SetInt(&bi)
+	f64, exact := bf.Float64()
+	return f64, exact == big.Exact // exact为true表示无精度丢失
+}
+
 func UpdateBorrowRate(marketId uint64, con *sql.DB) {
 	marketInfos := GetMarketInfo(marketId)
 	var baseUnit float64 = 1e16
 	var maxUtilization float64 = 1
 	if len(marketInfos) > 0 {
 		marketInfo := marketInfos[0]
-
-		// supplyRate, _ := strconv.ParseFloat(marketInfo[2], 64)        //存利率
-		// borrowRate, _ := strconv.ParseFloat(marketInfo[3], 64)        //借利率
-		// totalSupplyAssets, _ := strconv.ParseFloat(marketInfo[8], 64) //总存入数量
-		// totalBorrowAssets, _ := strconv.ParseFloat(marketInfo[9], 64) //总借出数量
-		supplyRate := float64(marketInfo.SupplyRate)                       //存利率
-		borrowRate := float64(marketInfo.BorrowRate)                       //借利率
-		totalSupplyAssets := float64(marketInfo.TotalSupplyAssets)         //总存入数量
-		totalCollateralAssets := float64(marketInfo.TotalCollateralAssets) //总抵押
-		totalBorrowAssets := float64(marketInfo.TotalBorrowAssets)         //总借出数量
+		supplyRate, _ := bigIntToFloat64(marketInfo.SupplyRate)                       //存利率
+		borrowRate, _ := bigIntToFloat64(marketInfo.BorrowRate)                       //借利率
+		totalSupplyAssets, _ := bigIntToFloat64(marketInfo.TotalSupplyAssets)         //总存入数量
+		totalCollateralAssets, _ := bigIntToFloat64(marketInfo.TotalCollateralAssets) //总抵押
+		totalBorrowAssets, _ := bigIntToFloat64(marketInfo.TotalBorrowAssets)         //总借出数量
 		liquidityProportion := 0.00
 		if totalBorrowAssets > 0 {
 			liquidityProportion = (totalBorrowAssets / (totalSupplyAssets * maxUtilization)) * 100
@@ -99,7 +101,7 @@ func UpdateBorrowRate(marketId uint64, con *sql.DB) {
 			borrowRateStr = "<0.01%"
 		}
 		liquidityProportionStr := fmt.Sprintf("%.16f", liquidityProportion)
-		title := "HEARN-USDC-SUI"
+		title := marketInfo.Title
 		upSql := "update borrow set total_supply_amount=?,total_supply_collateral_amount=?,total_loan_amount=?,supply_rate=?,borrow_rate=?,liquidity=?,liquidity_proportion=?,market_title=?,scheduled_execution=1 where market_id=?"
 		_, upErr := con.Exec(upSql, totalSupplyAssets, totalCollateralAssets, totalBorrowAssets, supplyRateStr, borrowRateStr, liquidity, liquidityProportionStr, title, marketId)
 		if upErr != nil {
@@ -194,43 +196,38 @@ func (m *MarketInfo) UnmarshalBCS(d *bcs.Deserializer) error {
 	m.Ltv = d.U64()
 	m.Lltv = d.U64()
 	m.LiquidationThreshold = d.U64()
-	m.TotalSupplyAssets = d.U64()
-	m.TotalBorrowAssets = d.U64()
-	m.TotalCollateralAssets = d.U64()
-	m.Fee = d.U64()
-	m.FlashloanFee = d.U64()
-	m.SupplyRate = d.U64()
-	m.BorrowRate = d.U64()
-	m.UtilizationRate = d.U64()
+	m.TotalSupplyAssets = d.U128()
+	m.TotalBorrowAssets = d.U128()
+	m.TotalCollateralAssets = d.U128()
+	m.Fee = d.U128()
+	m.FlashloanFee = d.U128()
+	m.SupplyRate = d.U128()
+	m.BorrowRate = d.U128()
+	m.UtilizationRate = d.U128()
 	m.MarketPaused = d.Bool()
 	m.GlobalPaused = d.Bool()
-	// titleByte := d.ReadBytes()
-
-	// deserializer := bcs.NewDeserializer(titleByte)
-	// log.Printf("title=%b", )
-
 	m.Title = d.ReadString()
 	return nil
 }
 
 type MarketInfo struct {
-	MarketId              uint64 `bcs:"market_id"`
-	SupplyCoinType        string `bcs:"supply_coin_type"`
-	CollateralCoinType    string `bcs:"collateral_coin_type"`
-	Ltv                   uint64 `bcs:"ltv"`
-	Lltv                  uint64 `bcs:"lltv"`                    // Liquidation Loan-to-Value in WAD
-	LiquidationThreshold  uint64 `bcs:"liquidation_threshold"`   // Liquidation threshold (same as LLTV)
-	TotalSupplyAssets     uint64 `bcs:"total_supply_assets"`     // Total supplied assets
-	TotalBorrowAssets     uint64 `bcs:"total_borrow_assets"`     // Total borrowed assets
-	TotalCollateralAssets uint64 `bcs:"total_collateral_assets"` // Total collateral assets
-	Fee                   uint64 `bcs:"fee"`                     // Protocol fee in WAD
-	FlashloanFee          uint64 `bcs:"flashloan_fee"`           // Flash loan fee in WAD
-	SupplyRate            uint64 `bcs:"supply_rate"`             // Current supply rate (WAD precision)
-	BorrowRate            uint64 `bcs:"borrow_rate"`             // Current borrow rate (WAD precision)
-	UtilizationRate       uint64 `bcs:"utilization_rate"`        // Market utilization rate (WAD precision, total_borrow / total_supply)
-	MarketPaused          bool   `bcs:"market_paused"`           // Market-level pause flag
-	GlobalPaused          bool   `bcs:"global_paused"`           // Global pause flag
-	Title                 string `bcs:"title"`                   // Human readable market title
+	MarketId              uint64  `bcs:"market_id"`
+	SupplyCoinType        string  `bcs:"supply_coin_type"`
+	CollateralCoinType    string  `bcs:"collateral_coin_type"`
+	Ltv                   uint64  `bcs:"ltv"`
+	Lltv                  uint64  `bcs:"lltv"`                    // Liquidation Loan-to-Value in WAD
+	LiquidationThreshold  uint64  `bcs:"liquidation_threshold"`   // Liquidation threshold (same as LLTV)
+	TotalSupplyAssets     big.Int `bcs:"total_supply_assets"`     // Total supplied assets
+	TotalBorrowAssets     big.Int `bcs:"total_borrow_assets"`     // Total borrowed assets
+	TotalCollateralAssets big.Int `bcs:"total_collateral_assets"` // Total collateral assets
+	Fee                   big.Int `bcs:"fee"`                     // Protocol fee in WAD
+	FlashloanFee          big.Int `bcs:"flashloan_fee"`           // Flash loan fee in WAD
+	SupplyRate            big.Int `bcs:"supply_rate"`             // Current supply rate (WAD precision)
+	BorrowRate            big.Int `bcs:"borrow_rate"`             // Current borrow rate (WAD precision)
+	UtilizationRate       big.Int `bcs:"utilization_rate"`        // Market utilization rate (WAD precision, total_borrow / total_supply)
+	MarketPaused          bool    `bcs:"market_paused"`           // Market-level pause flag
+	GlobalPaused          bool    `bcs:"global_paused"`           // Global pause flag
+	Title                 string  `bcs:"title"`                   // Human readable market title
 }
 
 // 实现 bcs.Marshaler 接口（可选，默认通过反射）
