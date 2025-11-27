@@ -37,6 +37,8 @@ func UpdateMarketRate() {
 	rs, err := con.Query(sql)
 	if err != nil {
 		fmt.Printf("UpdateMarketRate 查询borrow失败：%v\n", err.Error())
+		defer con.Close()
+		return
 	}
 	var marketIds []uint64
 	for rs.Next() {

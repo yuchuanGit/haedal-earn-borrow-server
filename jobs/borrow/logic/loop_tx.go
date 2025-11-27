@@ -137,17 +137,20 @@ func InsertRateDetali(parsedJson map[string]interface{}, transactions []interfac
 		queryRs, queryErr := con.Query("select * from rate_detail where digest=?", digest)
 		if queryErr != nil {
 			log.Printf("borrow查询 digest失败: %v", queryErr)
+			defer con.Close()
 			return
 		}
 		if queryRs.Next() {
 			fmt.Printf("AccrueInterestEvent digest exist :%v\n", digest)
 			defer queryRs.Close()
+			defer con.Close()
 			return
 		}
 		sql := "insert into rate_detail(rate_type,market_id,collateral_token_type,loan_token_type,borrow_rate,fee_shares,interest,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
 		result, err := con.Exec(sql, funcName, market_id, collateralType, loanlType, borrowRate, feeShares, interest, digest, transactionTimeUnix, transactionTime)
 		if err != nil {
 			log.Printf("rate_detail新增失败: %v", err)
+			defer con.Close()
 			return
 		}
 		lastInsertID, _ := result.LastInsertId()
@@ -174,17 +177,20 @@ func InsertBorroWithdrawCollateral(parsedJson map[string]interface{}, digest str
 	queryRs, queryErr := con.Query("select * from borrow_repay_detail where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("borrow查询 digest失败: %v", queryErr)
+		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
 		fmt.Printf("RepayEvent digest exist :%v\n", digest)
 		defer queryRs.Close() // 务必关闭结果集
+		defer con.Close()
 		return
 	}
 	sql := "insert into borrow_withdraw_collateral(market_id,caller_address,on_behalf_address,receiver,assets,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
 	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, receiver_address, assets, collateralType, loanlType, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("borrow_withdraw_collateral新增失败: %v", err)
+		defer con.Close()
 		return
 	}
 	lastInsertID, _ := result.LastInsertId()
@@ -207,11 +213,13 @@ func InsertBorrowRepayDetali(parsedJson map[string]interface{}, digest string, t
 	queryRs, queryErr := con.Query("select * from borrow_repay_detail where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("borrow查询 digest失败: %v", queryErr)
+		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
 		fmt.Printf("RepayEvent digest exist :%v\n", digest)
 		defer queryRs.Close() // 务必关闭结果集
+		defer con.Close()
 		return
 	}
 
@@ -219,6 +227,7 @@ func InsertBorrowRepayDetali(parsedJson map[string]interface{}, digest string, t
 	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, assets, shares, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("borrow_repay_detail新增失败: %v", err)
+		defer con.Close()
 		return
 	}
 	lastInsertID, _ := result.LastInsertId()
@@ -242,11 +251,13 @@ func InsertBorrowDetali(parsedJson map[string]interface{}, digest string, transa
 	queryRs, queryErr := con.Query("select * from borrow_detail where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("borrow查询 digest失败: %v", queryErr)
+		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
 		fmt.Printf("BorrowEvent digest exist :%v\n", digest)
 		defer queryRs.Close() // 务必关闭结果集
+		defer con.Close()
 		return
 	}
 
@@ -254,6 +265,7 @@ func InsertBorrowDetali(parsedJson map[string]interface{}, digest string, transa
 	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, receiver_address, assets, shares, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("borrow_detail新增失败: %v", err)
+		defer con.Close()
 		return
 	}
 	lastInsertID, _ := result.LastInsertId()
@@ -291,11 +303,13 @@ func InsertBorrowSupplyDetaliCollateral(parsedJson map[string]interface{}, diges
 	queryRs, queryErr := con.Query("select * from borrow_supply_detail where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("borrow查询 digest失败: %v", queryErr)
+		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
 		fmt.Printf("SupplyCollateralEvent digest exist :%v\n", digest)
 		defer queryRs.Close() // 务必关闭结果集
+		defer con.Close()
 		return
 	}
 
@@ -303,6 +317,7 @@ func InsertBorrowSupplyDetaliCollateral(parsedJson map[string]interface{}, diges
 	result, err := con.Exec(sql, 2, market_id, caller_address, on_behalf_address, assets, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("borrow_supply_detail_collateral新增失败: %v", err)
+		defer con.Close()
 		return
 	}
 	lastInsertID, _ := result.LastInsertId()
@@ -340,11 +355,13 @@ func InsertBorrowSupplyDetali(parsedJson map[string]interface{}, digest string, 
 	queryRs, queryErr := con.Query("select * from borrow_supply_detail where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("borrow查询 digest失败: %v", queryErr)
+		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
 		fmt.Printf("SupplyEvent digest exist :%v\n", digest)
 		defer queryRs.Close() // 务必关闭结果集
+		defer con.Close()
 		return
 	}
 
@@ -352,6 +369,7 @@ func InsertBorrowSupplyDetali(parsedJson map[string]interface{}, digest string, 
 	result, err := con.Exec(sql, 1, market_id, caller_address, on_behalf_address, assets, shares, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("新增失败: %v", err)
+		defer con.Close()
 		return
 	}
 	lastInsertID, _ := result.LastInsertId()
@@ -396,12 +414,14 @@ func InsertBorrow(parsedJson map[string]interface{}, digest string, transactionT
 	queryRs, queryErr := con.Query("select * from borrow where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("borrow查询 digest失败: %v", queryErr)
+		defer con.Close()
 		return
 	}
 
 	if queryRs.Next() {
 		fmt.Printf("CreateMarketEvent digest exist :%v\n", digest)
 		defer queryRs.Close() // 务必关闭结果集，避免资源泄漏
+		defer con.Close()
 		return
 	}
 
@@ -409,6 +429,7 @@ func InsertBorrow(parsedJson map[string]interface{}, digest string, transactionT
 	result, err := con.Exec(sql, digest, title, collateralType, fee, lltv, ltv, loanType, marketId, oracleId, baseTokenDecimals, quoteTokenDecimals, transactionTime)
 	if err != nil {
 		log.Printf("新增失败: %v", err)
+		defer con.Close()
 		return
 	}
 	lastInsertID, _ := result.LastInsertId()

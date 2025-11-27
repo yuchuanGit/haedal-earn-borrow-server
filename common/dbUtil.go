@@ -7,27 +7,28 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql" // MySQL 驱动（下划线表示只引入不直接使用）
 	"gopkg.in/ini.v1"
 )
 
 func GetDbConnection() *sql.DB {
-	// if err := InitConfig(); err != nil {
-	// 	log.Fatalf("配置初始化失败：%v", err)
-	// }
-	// mysqlConf := GlobalConfig.MySQL
-	// var builder strings.Builder
-	// builder.WriteString(mysqlConf.UserName)
-	// builder.WriteString(":")
-	// builder.WriteString(mysqlConf.Password)
-	// builder.WriteString("@tcp(")
-	// builder.WriteString(mysqlConf.Host + ":" + mysqlConf.Port)
-	// builder.WriteString(")/" + mysqlConf.DBName)
-	// builder.WriteString("?charset=utf8mb4&parseTime=True&loc=Local")
-	// dsn := builder.String()
+	if err := InitConfig(); err != nil {
+		log.Fatalf("配置初始化失败：%v", err)
+	}
+	mysqlConf := GlobalConfig.MySQL
+	var builder strings.Builder
+	builder.WriteString(mysqlConf.UserName)
+	builder.WriteString(":")
+	builder.WriteString(mysqlConf.Password)
+	builder.WriteString("@tcp(")
+	builder.WriteString(mysqlConf.Host + ":" + mysqlConf.Port)
+	builder.WriteString(")/" + mysqlConf.DBName)
+	builder.WriteString("?charset=utf8mb4&parseTime=True&loc=Local")
+	dsn := builder.String()
 	// log.Printf("dsn=%v\n", dsn)
-	dsn := "haedalOne:haedalOne!@#@tcp(52.74.206.162:3307)/haedal_earn_borrow?charset=utf8mb4&parseTime=True&loc=Local"
+	// dsn := "haedalOne:haedalOne!@#@tcp(52.74.206.162:3307)/haedal_earn_borrow?charset=utf8mb4&parseTime=True&loc=Local"
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
