@@ -9,16 +9,19 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
 const (
-	SUICoinType  = "SUI"
-	SUIFeefId    = "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266"
-	USDCCoinType = "USDC"
-	USDCFeefId   = "0x41f3625971ca2ed2263e78573fe5ce23e13d2558ed3f2e47ab0f84fb9e7ae722"
+	SUICoinType      = "SUI"
+	SUIFeefId        = "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266"
+	USDCCoinType     = "USDC"
+	USDCFeefId       = "0x41f3625971ca2ed2263e78573fe5ce23e13d2558ed3f2e47ab0f84fb9e7ae722"
+	DateFormatYMDHms = ""
+	DateFormatYMDHm  = "2006-01-02 15:04"
 )
 
 type BorrowModel struct {
@@ -85,6 +88,7 @@ type BorrowLine struct {
 	TransactionTime string
 	DateUnit        string
 	Amount          string
+	TotalAmount     string
 }
 
 type UserTotalCollateraModel struct {
@@ -446,7 +450,7 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 		"left join borrow b on b.market_id=userMarket.market_id " +
 		"left join coin_config cc on cc.coin_type=b.collateral_token_type ORDER BY userMarket.dateUnit"
 	withdrawSql := "SELECT userMarket.*,cc.feed_id  from ( " +
-		"SELECT DATE_FORMAT(transaction_time,?) AS dateUnit,sum( assets ) AS amount, " +
+		"SELECT DATE_FORMAT( max( transaction_time ), '%Y-%m-%d %H:%i' ) AS transaction_time,DATE_FORMAT(transaction_time,?) AS dateUnit,sum( assets ) AS amount, " +
 		"market_id,max(collateral_token_type) as collateral_token_type FROM borrow_withdraw_collateral " +
 		"WHERE caller_address =? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit, market_id)  userMarket " +
 		"LEFT JOIN coin_config cc ON cc.coin_type = userMarket.collateral_token_type ORDER BY userMarket.dateUnit"
@@ -478,7 +482,7 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 	}
 	for withdrawRs.Next() {
 		var u UserTotalCollateraModel
-		scanErr := withdrawRs.Scan(&u.DateUnit, &u.Amount, &u.MarketId, &u.CoinType, &u.FeedId)
+		scanErr := withdrawRs.Scan(&u.TransactionTime, &u.DateUnit, &u.Amount, &u.MarketId, &u.CoinType, &u.FeedId)
 		num, _ := strconv.ParseFloat(u.Amount, 64)
 		str1 := fmt.Sprintf("%.0f", num)
 		u.Amount = str1
@@ -498,20 +502,16 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 		pythCoinFeedPrice := coinPrice[um.FeedId]
 		usdUnitPrice := FeedIdUsdUnitPrice(pythCoinFeedPrice)
 		floatAmountVal := CalculateCoinDecimalFloat(um.Amount, um.CoinType)
-		// log.Printf("floatAmountVal=%v\n", floatAmountVal)
-		// log.Printf("usdUnitPrice=%v\n", usdUnitPrice)
 		coinUsdAmount := floatAmountVal * usdUnitPrice
 		supplyCollateralSum += coinUsdAmount
 		b.Amount = fmt.Sprintf("%.2f", supplyCollateralSum)
+		b.TotalAmount = fmt.Sprintf("%.2f", supplyCollateralSum)
 		b.DateUnit = um.DateUnit
 		b.TransactionTime = um.TransactionTime
 		dateData, ok := dateMaps[um.DateUnit]
 		if !ok {
 			dateMaps[um.DateUnit] = b
 		} else {
-			// log.Printf("11111=%v\n", um.DateUnit)
-			// usdAmount, _ := strconv.ParseFloat(dateData.Amount, 64)
-			// usdAmount += coinUsdAmount
 			dateData.Amount = fmt.Sprintf("%.2f", supplyCollateralSum)
 			dateMaps[um.DateUnit] = dateData
 		}
@@ -525,18 +525,18 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 		coinUsdAmount := floatAmountVal * usdUnitPrice
 		withdrawCollateralSum += coinUsdAmount
 		b.Amount = fmt.Sprintf("%.2f", withdrawCollateralSum)
+		b.TotalAmount = fmt.Sprintf("%.2f", withdrawCollateralSum)
 		b.DateUnit = umw.DateUnit
 		b.TransactionTime = umw.TransactionTime
 		dateData, ok := dateWithdrawMaps[umw.DateUnit]
 		if !ok {
 			dateWithdrawMaps[umw.DateUnit] = b
 		} else {
-			// usdAmount, _ := strconv.ParseFloat(dateData.Amount, 64)
-			// usdAmount += coinUsdAmount
 			dateData.Amount = fmt.Sprintf("%.2f", withdrawCollateralSum)
 			dateWithdrawMaps[umw.DateUnit] = dateData
 		}
 	}
+
 	for _, bl := range dateMaps {
 		withdraw, ok := dateWithdrawMaps[bl.DateUnit]
 		if !ok {
@@ -548,10 +548,69 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 			bl.Amount = fmt.Sprintf("%.2f", val)
 		}
 		lines = append(lines, bl)
+		delete(dateWithdrawMaps, bl.DateUnit)
 	}
-	// utils.PrettyPrint(dateMaps)
+
+	supplyKeys := SupplyCollateralTimeStrSortDesc(dateMaps)
+	for _, wl := range dateWithdrawMaps {
+		newLessThanTimeStr := TagerNewLessThanKey(wl.TransactionTime, supplyKeys)
+		targetLayout := "01/02 15" // go固定日期转换格式
+		time, _ := parseTimeKey(newLessThanTimeStr)
+		targetStr := time.Format(targetLayout)
+		supplyO, ok := dateMaps[targetStr]
+		if !ok {
+			log.Println("YourTotalSupplyLine supplyDate=%v\n", targetStr)
+		} else {
+			supplyCollateralVal, _ := strconv.ParseFloat(supplyO.TotalAmount, 64)
+			withdrawCollateralVal, _ := strconv.ParseFloat(wl.Amount, 64)
+			log.Printf("supplyCollateralVal=%v", fmt.Sprintf("%.2f", supplyCollateralVal))
+			log.Printf("withdrawCollateralVal=%v", fmt.Sprintf("%.2f", withdrawCollateralVal))
+			val := supplyCollateralVal - withdrawCollateralVal
+			wl.Amount = fmt.Sprintf("%.2f", val)
+			lines = append(lines, wl)
+		}
+	}
+	sort.Slice(lines, func(i, j int) bool {
+		ti, _ := time.Parse(DateFormatYMDHm, lines[i].TransactionTime)
+		tj, _ := time.Parse(DateFormatYMDHm, lines[j].TransactionTime)
+		return ti.Before(tj) // 升序：i时间早于j则i排在前面
+	})
 	defer con.Close()
 	return lines, nil
+}
+
+// 存入抵押日期倒序排序
+func SupplyCollateralTimeStrSortDesc(dateMaps map[string]BorrowLine) []string {
+	supplyKeys := make([]string, 0, len(dateMaps))
+	for _, supplyObj := range dateMaps {
+		supplyKeys = append(supplyKeys, supplyObj.TransactionTime)
+	}
+
+	// 按时间顺序排序键（解析为time.Time后比较）
+	sort.Slice(supplyKeys, func(i, j int) bool {
+		t1, _ := parseTimeKey(supplyKeys[i])
+		t2, _ := parseTimeKey(supplyKeys[j])
+		return t2.Before(t1)
+	})
+	return supplyKeys
+}
+
+func parseTimeKey(key string) (time.Time, error) {
+	// 对应YYYY-MM-DD HH:MM的时间布局
+	return time.Parse(DateFormatYMDHm, key)
+}
+
+func TagerNewLessThanKey(targetKey string, supplyKeys []string) string {
+	resultKey := ""
+	targetTime, _ := parseTimeKey(targetKey)
+	for _, key := range supplyKeys {
+		keyTime, _ := parseTimeKey(key)
+		if keyTime.Before(targetTime) {
+			resultKey = key
+			break // 找到第一个符合条件的键
+		}
+	}
+	return resultKey
 }
 
 type TotalCollateralBorrowVo struct {

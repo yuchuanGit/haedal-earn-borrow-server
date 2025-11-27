@@ -43,10 +43,8 @@ const (
 	AccrueInterestEvent     = "::events::AccrueInterestEvent"
 )
 
-func RpcApiRequest() {
-	cli := sui.NewSuiClient("https://sui-testnet-endpoint.blockvision.org")
-	ctx := context.Background()
-	resp, err := cli.SuiXQueryTransactionBlocks(ctx, models.SuiXQueryTransactionBlocksRequest{
+func SuiTransactionBlockParameter(nextCursor string) models.SuiXQueryTransactionBlocksRequest {
+	params := models.SuiXQueryTransactionBlocksRequest{
 		SuiTransactionBlockResponseQuery: models.SuiTransactionBlockResponseQuery{
 			TransactionFilter: models.TransactionFilter{
 				// "ChangedObject": HEarnObjectId,
@@ -62,9 +60,27 @@ func RpcApiRequest() {
 				ShowEvents:  true,
 			},
 		},
-	})
+		Limit:           50,
+		DescendingOrder: false,
+	}
+	if nextCursor != "" && nextCursor != "null" && nextCursor != "undefined" {
+		params.Cursor = nextCursor
+	}
+	return params
+}
+
+func RpcApiRequest(nextCursor string) {
+	log.Printf("SuiXQueryTransactionBlocks nextCursor=%v\n", nextCursor)
+	cli := sui.NewSuiClient("https://sui-testnet-endpoint.blockvision.org")
+	ctx := context.Background()
+	resp, err := cli.SuiXQueryTransactionBlocks(ctx, SuiTransactionBlockParameter(nextCursor))
 	if err != nil {
 		fmt.Printf("RpcApiRequest err:%v\n", err)
+		return
+	}
+	if len(resp.Data) == 0 {
+		log.Printf("SuiXQueryTransactionBlocks lastCursor=%v\n", nextCursor)
+		return
 	}
 	for i := len(resp.Data) - 1; i >= 0; i-- {
 		data := resp.Data[i]
@@ -91,7 +107,7 @@ func RpcApiRequest() {
 			}
 		}
 	}
-
+	RpcApiRequest(resp.NextCursor)
 	// for _, data := range resp.Data {
 	// 	digest := data.Digest
 	// 	transactionTime := data.TimestampMs
@@ -174,7 +190,7 @@ func InsertBorroWithdrawCollateral(parsedJson map[string]interface{}, digest str
 	}
 	transactionTime := time.UnixMilli(convRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from borrow_repay_detail where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from borrow_withdraw_collateral where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("borrow查询 digest失败: %v", queryErr)
 		defer con.Close()
