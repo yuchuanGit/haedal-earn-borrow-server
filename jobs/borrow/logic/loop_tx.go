@@ -78,6 +78,7 @@ func RpcApiRequest(nextCursor string) {
 		fmt.Printf("RpcApiRequest err:%v\n", err)
 		return
 	}
+	EventsCursorUpdate(resp.NextCursor)
 	if len(resp.Data) == 0 {
 		log.Printf("SuiXQueryTransactionBlocks lastCursor=%v\n", nextCursor)
 		return
@@ -123,6 +124,32 @@ func RpcApiRequest(nextCursor string) {
 	// 		}
 	// 	}
 	// }
+}
+
+func EventsCursorUpdate(digest string) {
+	con := common.GetDbConnection()
+	sql := "update scheduled_task_record set digest=? where timing_type=1"
+	rs, err := con.Exec(sql, digest)
+	if err != nil {
+		log.Printf("scheduled_task_record update digest失败：%v\n", err)
+	}
+	updateRowCount, _ := rs.RowsAffected()
+	log.Printf("scheduled_task_record updateRowCount=:%d\n", updateRowCount)
+	defer con.Close()
+}
+
+func QueryEventsCursor() string {
+	digest := ""
+	con := common.GetDbConnection()
+	sql := "select digest from scheduled_task_record where timing_type=1"
+	err := con.QueryRow(sql).Scan(&digest)
+	if err != nil {
+		log.Printf("QueryEventsCursor失败：%v\n", err)
+		defer con.Close()
+		return digest
+	}
+	defer con.Close()
+	return digest
 }
 
 func GetTransactionFunctionName(transactions []interface{}) string {
