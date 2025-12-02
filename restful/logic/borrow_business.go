@@ -20,8 +20,9 @@ const (
 	SUIFeefId        = "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266"
 	USDCCoinType     = "USDC"
 	USDCFeefId       = "0x41f3625971ca2ed2263e78573fe5ce23e13d2558ed3f2e47ab0f84fb9e7ae722"
-	DateFormatYMDHms = ""
+	DateFormatYMDHms = "2006-01-02 15:04:05.000"
 	DateFormatYMDHm  = "2006-01-02 15:04"
+	DateFormatYMD    = "2006-01-02"
 )
 
 type BorrowModel struct {
@@ -430,19 +431,26 @@ func QueryBorrowDetailLine(marketId string, timePeriodType int8, lineType int8) 
 
 func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine, error) {
 	var lines []BorrowLine
+	var resultData []BorrowLine
+	dateKeys := make(map[string]BorrowLine)
 	dateFormat := "%m/%d %H"
 	now := time.Now()
 	end := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999, now.Location())
 	start := end.AddDate(0, 0, -7)
+	start = start.Add(1000 * time.Millisecond)
+	isWeek := true
+	// log.Printf("start = %v\n", start.Format(DateFormatYMDHms))
 	if timePeriodType == 2 {
 		dateFormat = "%m/%d"
 		start = end.AddDate(0, 0, -30)
+		isWeek = false
 	}
-
 	if timePeriodType == 3 {
 		dateFormat = "%m/%d"
 		start = end.AddDate(0, 0, -90)
+		isWeek = false
 	}
+	// end = end.AddDate(0, 0, -1)
 	con := common.GetDbConnection()
 	sql := "SELECT userMarket.*,cc.coin_type,cc.feed_id from" +
 		"(SELECT DATE_FORMAT( max(transaction_time), '%Y-%m-%d %H:%i' ) AS transaction_time,DATE_FORMAT(transaction_time,?) AS dateUnit,sum( assets ) AS amount,market_id FROM borrow_supply_detail " +
@@ -454,7 +462,6 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 		"market_id,max(collateral_token_type) as collateral_token_type FROM borrow_withdraw_collateral " +
 		"WHERE caller_address =? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit, market_id)  userMarket " +
 		"LEFT JOIN coin_config cc ON cc.coin_type = userMarket.collateral_token_type ORDER BY userMarket.dateUnit"
-	// log.Printf("YourTotalSupplyLineSql=%v\n", sql)
 	rs, err := con.Query(sql, dateFormat, 2, userAddress, start, end)
 	withdrawRs, withdrawErr := con.Query(withdrawSql, dateFormat, userAddress, start, end)
 	if err != nil {
@@ -494,6 +501,7 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 	}
 	dateMaps := make(map[string]BorrowLine)
 	dateWithdrawMaps := make(map[string]BorrowLine)
+	dateWithdrawRemoveMaps := make(map[string]BorrowLine)
 	coinPrice := PythPrice(feedIds)
 	supplyCollateralSum := 0.00
 	withdrawCollateralSum := 0.00
@@ -517,8 +525,10 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 		}
 	}
 
+	var withdrawTransactionTimes []string
 	for _, umw := range userWithdrawTotals {
 		var b BorrowLine
+		withdrawTransactionTimes = append(withdrawTransactionTimes, umw.TransactionTime)
 		pythCoinFeedPrice := coinPrice[umw.FeedId]
 		usdUnitPrice := FeedIdUsdUnitPrice(pythCoinFeedPrice)
 		floatAmountVal := CalculateCoinDecimalFloat(umw.Amount, umw.CoinType)
@@ -531,43 +541,62 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 		dateData, ok := dateWithdrawMaps[umw.DateUnit]
 		if !ok {
 			dateWithdrawMaps[umw.DateUnit] = b
+			dateWithdrawRemoveMaps[umw.DateUnit] = b
 		} else {
 			dateData.Amount = fmt.Sprintf("%.2f", withdrawCollateralSum)
 			dateWithdrawMaps[umw.DateUnit] = dateData
+			dateWithdrawRemoveMaps[umw.DateUnit] = dateData
 		}
 	}
 
+	sort.Slice(withdrawTransactionTimes, func(i, j int) bool {
+		t1, _ := parseTimeKey(withdrawTransactionTimes[i])
+		t2, _ := parseTimeKey(withdrawTransactionTimes[j])
+		return t2.Before(t1)
+	})
 	for _, bl := range dateMaps {
+		var wc BorrowLine
 		withdraw, ok := dateWithdrawMaps[bl.DateUnit]
 		if !ok {
 			log.Printf("%v时间没有取抵押\n", bl.DateUnit)
+			lessThanTransactionTime := TagerNewLessThanKey(bl.TransactionTime, withdrawTransactionTimes)
+			timeL, _ := parseTimeKey(lessThanTransactionTime)
+			targetLayout := DateGroupFormat(isWeek)
+			targetStr := timeL.Format(targetLayout)
+			withdrawLessThanSupply, withdrawLessThanSupplyOk := dateWithdrawMaps[targetStr]
+			if !withdrawLessThanSupplyOk {
+				log.Printf("取抵押没有小于存TransactionTime%v\n", bl.TransactionTime)
+			}
+			wc = withdrawLessThanSupply
 		} else {
-			supplyCollateralVal, _ := strconv.ParseFloat(bl.Amount, 64)
-			withdrawCollateralVal, _ := strconv.ParseFloat(withdraw.Amount, 64)
-			val := supplyCollateralVal - withdrawCollateralVal
-			bl.Amount = fmt.Sprintf("%.2f", val)
+			wc = withdraw
 		}
+		supplyCollateralVal, _ := strconv.ParseFloat(bl.Amount, 64)
+		withdrawCollateralVal, _ := strconv.ParseFloat(wc.Amount, 64)
+		val := supplyCollateralVal - withdrawCollateralVal
+		bl.Amount = fmt.Sprintf("%.2f", val)
 		lines = append(lines, bl)
-		delete(dateWithdrawMaps, bl.DateUnit)
+		dateKeys[bl.DateUnit] = bl
+		delete(dateWithdrawRemoveMaps, bl.DateUnit)
 	}
 
 	supplyKeys := SupplyCollateralTimeStrSortDesc(dateMaps)
-	for _, wl := range dateWithdrawMaps {
+
+	for _, wl := range dateWithdrawRemoveMaps {
 		newLessThanTimeStr := TagerNewLessThanKey(wl.TransactionTime, supplyKeys)
-		targetLayout := "01/02 15" // go固定日期转换格式
+		targetLayout := DateGroupFormat(isWeek) // go固定日期转换格式
 		time, _ := parseTimeKey(newLessThanTimeStr)
 		targetStr := time.Format(targetLayout)
 		supplyO, ok := dateMaps[targetStr]
 		if !ok {
-			log.Println("YourTotalSupplyLine supplyDate=%v\n", targetStr)
+			log.Printf("YourTotalSupplyLine supplyDate=%v\n", targetStr)
 		} else {
 			supplyCollateralVal, _ := strconv.ParseFloat(supplyO.TotalAmount, 64)
 			withdrawCollateralVal, _ := strconv.ParseFloat(wl.Amount, 64)
-			log.Printf("supplyCollateralVal=%v", fmt.Sprintf("%.2f", supplyCollateralVal))
-			log.Printf("withdrawCollateralVal=%v", fmt.Sprintf("%.2f", withdrawCollateralVal))
 			val := supplyCollateralVal - withdrawCollateralVal
 			wl.Amount = fmt.Sprintf("%.2f", val)
 			lines = append(lines, wl)
+			dateKeys[wl.DateUnit] = wl
 		}
 	}
 	sort.Slice(lines, func(i, j int) bool {
@@ -575,8 +604,117 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 		tj, _ := time.Parse(DateFormatYMDHm, lines[j].TransactionTime)
 		return ti.Before(tj) // 升序：i时间早于j则i排在前面
 	})
+	log.Printf("start=%v\n", start.Format(DateFormatYMD))
+	log.Printf("end=%v\n", end.Format(DateFormatYMD))
+	virtualTimePeriodData := TimePeriodDayGenerate(start, end, isWeek)  //虚拟时间段数据
+	supplyWithdrawKeysDesc := SupplyCollateralTimeStrSortDesc(dateKeys) //TransactionTime日期从大到小排序
+	supplyWithdrawKeys := supplyWithdrawKeysDesc
+	sort.Slice(supplyWithdrawKeys, func(i, j int) bool {
+		t1, _ := parseTimeKey(supplyWithdrawKeys[i])
+		t2, _ := parseTimeKey(supplyWithdrawKeys[j])
+		return t1.Before(t2)
+	})
+	for _, rsVal := range virtualTimePeriodData {
+		var obj BorrowLine
+		val, ok := dateKeys[rsVal.DateUnit]
+		if !ok {
+			lessThanKeys := TagerLessThanKeys(rsVal.TransactionTime, supplyWithdrawKeysDesc)
+			sort.Slice(lessThanKeys, func(i, j int) bool {
+				t1, _ := parseTimeKey(lessThanKeys[i])
+				t2, _ := parseTimeKey(lessThanKeys[j])
+				return t2.Before(t1)
+			})
+			newLessThanTimeStr := TagerNewLessThanKey(rsVal.TransactionTime, lessThanKeys)
+			targetLayout := DateGroupFormat(isWeek)
+			timeL, _ := parseTimeKey(newLessThanTimeStr)
+			targetStr := timeL.Format(targetLayout)
+			supplyWithdrawL, okL := dateKeys[targetStr]
+			if !okL {
+				if rsVal.TransactionTime == "2025-11-27 12:00" {
+					log.Printf("没有小于TransactionTime=%v\n", rsVal.TransactionTime)
+				}
+				newGreaterThanTimeStr := TagerNewGreaterThanKey(rsVal.TransactionTime, supplyWithdrawKeys)
+				timeG, _ := parseTimeKey(newGreaterThanTimeStr)
+				targetStr := timeG.Format(targetLayout)
+				supplyWithdrawG, okG := dateKeys[targetStr]
+				if !okG {
+					log.Printf("没有大于TransactionTime=%v\n", rsVal.TransactionTime)
+				} else {
+					obj.TransactionTime = rsVal.TransactionTime
+					obj.DateUnit = rsVal.DateUnit
+					obj.Amount = supplyWithdrawG.Amount
+					obj.TotalAmount = supplyWithdrawG.TotalAmount
+				}
+			} else {
+				obj.TransactionTime = rsVal.TransactionTime
+				obj.DateUnit = rsVal.DateUnit
+				obj.Amount = supplyWithdrawL.Amount
+				obj.TotalAmount = supplyWithdrawL.TotalAmount
+			}
+		} else {
+			obj = val
+			obj.TransactionTime = rsVal.TransactionTime
+		}
+		resultData = append(resultData, obj)
+	}
 	defer con.Close()
-	return lines, nil
+	return resultData, nil
+}
+
+func DayGenerate24Hours(yyyyMMdd string, isCurrentDate bool) []BorrowLine {
+	var lines []BorrowLine
+	yyyyMMdd = yyyyMMdd + " 00:00"
+	dateTime, err := parseTimeKey(yyyyMMdd)
+	lines = append(lines, initBorrowLineTime(dateTime, true))
+	if err != nil {
+		log.Printf("DayGenerate24Hours fail=%v", yyyyMMdd)
+	}
+	length := 23
+	if isCurrentDate {
+		now := time.Now()
+		length = now.Hour()
+	}
+	for i := 0; i < length; i++ {
+		dateTime = dateTime.Add(time.Hour) // 加1小时
+		lines = append(lines, initBorrowLineTime(dateTime, true))
+	}
+	return lines
+}
+
+func initBorrowLineTime(dateTime time.Time, isHous bool) BorrowLine {
+	var m BorrowLine
+	m.TransactionTime = dateTime.Format(DateFormatYMDHm)
+	m.DateUnit = dateTime.Format(DateGroupFormat(isHous))
+	return m
+}
+
+func DateGroupFormat(isHous bool) string {
+	dateFormat := "01/02"
+	if isHous {
+		dateFormat = "01/02 15"
+	}
+	return dateFormat
+}
+
+func TimePeriodDayGenerate(start time.Time, end time.Time, isHours bool) []BorrowLine {
+	var lines []BorrowLine
+	currentDate := time.Now().Format(DateFormatYMD)
+	for !start.After(end) {
+		// 日期加1天
+		if isHours {
+			if currentDate == start.Format(DateFormatYMD) {
+				lines = append(lines, DayGenerate24Hours(start.Format(DateFormatYMD), true)...)
+			} else {
+				lines = append(lines, DayGenerate24Hours(start.Format(DateFormatYMD), false)...)
+			}
+		} else {
+			b := initBorrowLineTime(start, false)
+			lines = append(lines, b)
+		}
+		start = start.AddDate(0, 0, 1)
+		// lines = append(lines, b)
+	}
+	return lines
 }
 
 // 存入抵押日期倒序排序
@@ -600,12 +738,39 @@ func parseTimeKey(key string) (time.Time, error) {
 	return time.Parse(DateFormatYMDHm, key)
 }
 
+// 找supplyKeys中第一个小于targetKey日期
 func TagerNewLessThanKey(targetKey string, supplyKeys []string) string {
 	resultKey := ""
 	targetTime, _ := parseTimeKey(targetKey)
 	for _, key := range supplyKeys {
 		keyTime, _ := parseTimeKey(key)
 		if keyTime.Before(targetTime) {
+			resultKey = key
+			break // 找到第一个符合条件的键
+		}
+	}
+	return resultKey
+}
+
+func TagerLessThanKeys(targetKey string, supplyKeys []string) []string {
+	var resultKeys []string
+	targetTime, _ := parseTimeKey(targetKey)
+	for _, key := range supplyKeys {
+		keyTime, _ := parseTimeKey(key)
+		if keyTime.Before(targetTime) {
+			resultKeys = append(resultKeys, key)
+		}
+	}
+	return resultKeys
+}
+
+// 找supplyKeys中第一个大于targetKey日期
+func TagerNewGreaterThanKey(targetKey string, supplyKeys []string) string {
+	resultKey := ""
+	targetTime, _ := parseTimeKey(targetKey)
+	for _, key := range supplyKeys {
+		keyTime, _ := parseTimeKey(key)
+		if targetTime.Before(keyTime) {
 			resultKey = key
 			break // 找到第一个符合条件的键
 		}
