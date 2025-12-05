@@ -22,6 +22,8 @@ func startEventJob() {
 		fmt.Println("event cron 任务执行：", time.Now().Format("15:04:05.000"))
 		nextCursor := logic.QueryEventsCursor()
 		logic.RpcApiRequest(nextCursor)
+		logic.RpcRequestScanCreateVault()
+		logic.ScanVaultEvent()
 	})
 	if err != nil {
 		fmt.Println("event添加任务失败：", err)

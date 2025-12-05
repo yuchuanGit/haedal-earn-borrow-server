@@ -129,7 +129,7 @@ func GetMarketInfo(marketId uint64) []MarketInfo {
 func DevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, moduleName string, funcName string, arguments []transaction.Argument) []MarketInfo {
 	var initVal []MarketInfo
 	tx.MoveCall(
-		models.SuiAddress(PackageIdDev),
+		models.SuiAddress(PackageId),
 		moduleName,
 		funcName,
 		[]transaction.TypeTag{},
