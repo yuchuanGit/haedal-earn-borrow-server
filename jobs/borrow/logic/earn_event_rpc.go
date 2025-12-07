@@ -67,11 +67,15 @@ func ScanVaultEvent() {
 }
 
 func RpcRequestScanVaultEvent(jobInfo ScheduledTaskRecord, isFinalTask bool) {
-	reqParams := SuiTransactionBlockVaultEventParameter(jobInfo.InputObjectId, jobInfo.Digest)
+	nextCursor := ""
+	if jobInfo.Digest != nil {
+		nextCursor = *jobInfo.Digest
+	}
+	reqParams := SuiTransactionBlockVaultEventParameter(jobInfo.InputObjectId, nextCursor)
 	resp := EventRpcRequest(reqParams)
 	EventsCursorUpdateById(resp.NextCursor, jobInfo.Id)
 	if len(resp.Data) == 0 {
-		log.Printf("RpcRequestScanVaultEvent lastCursor=%v\n", jobInfo.Digest)
+		log.Printf("RpcRequestScanVaultEvent lastCursor=%v\n", nextCursor)
 		if isFinalTask {
 			UpdateTimingTypeExecutionCompleted(false, ScheduledTaskTypeVault, 0) //更新所有Vault任务未执行
 		} else {
@@ -221,10 +225,10 @@ func QueryVaultExecutionInputObjectId() []ScheduledTaskRecord {
 
 type ScheduledTaskRecord struct {
 	Id                 int
-	TimingType         string //定时类型 1 borrow事件扫描 2.vault事件扫描'
-	Digest             string //下一次扫描事件游标
-	InputObjectId      string //扫描交易合约函数入参id
-	ExecutionCompleted bool   //扫描是否完成 0 为完成 1 完成
+	TimingType         string  //定时类型 1 borrow事件扫描 2.vault事件扫描'
+	Digest             *string //下一次扫描事件游标
+	InputObjectId      string  //扫描交易合约函数入参id
+	ExecutionCompleted bool    //扫描是否完成 0 为完成 1 完成
 }
 
 func EventRpcRequest(req models.SuiXQueryTransactionBlocksRequest) models.SuiXQueryTransactionBlocksResponse {
