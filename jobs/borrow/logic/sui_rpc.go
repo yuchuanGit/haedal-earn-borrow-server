@@ -126,6 +126,10 @@ func GetMarketInfo(marketId uint64) []MarketInfo {
 	return DevInspectTransactionBlock(cli, ctx, *tx, moduleName, funcName, arguments)
 }
 
+type moveCallResult struct {
+	ReturnValues []interface{}
+}
+
 func DevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, moduleName string, funcName string, arguments []transaction.Argument) []MarketInfo {
 	var initVal []MarketInfo
 	tx.MoveCall(
@@ -161,9 +165,6 @@ func DevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx transac
 		return initVal
 	}
 
-	type moveCallResult struct {
-		ReturnValues []interface{}
-	}
 	var moveCallReturn []moveCallResult
 	err3 := json.Unmarshal(resultsMarshalled, &moveCallReturn)
 	if err3 != nil {
