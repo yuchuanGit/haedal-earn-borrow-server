@@ -18,8 +18,10 @@ import (
 const (
 	// PackageId     = "0x7ba1b0d26e44022cf26e2e7f6b188495ddfb9c53cc6147723d2ff5deaff20bde" //11-26 16:00
 	// HEarnObjectId = "0xb999d1d9d5d0f053a7572021d4e00618c729caf07f1d4a0a6c93164d32215a3f"
-	PackageId      = "0xd44cf630ff04308f3a08f161aa0378b71f399d644c3af58d6dcf4a58e3963e8c" //12-03
-	HEarnObjectId  = "0xfa50ba56632a857630cbfde7871f7b8b738227e971ebf6c46173f928a6880373"
+	// PackageId      = "0xd44cf630ff04308f3a08f161aa0378b71f399d644c3af58d6dcf4a58e3963e8c" //12-03
+	// HEarnObjectId  = "0xfa50ba56632a857630cbfde7871f7b8b738227e971ebf6c46173f928a6880373"
+	PackageId      = "0x3279683b5157ce56a3d25a92b354750472053c31dd139771752d437ba8797906" //12-09 18:00
+	HEarnObjectId  = "0x42cbdc7214c46b55096fd76f9bed12382dd68216ec5147cd18624ff539dff04e"
 	SuiUserAddress = "0x438796b44e606f8768c925534ebb87be9ded13cc51a6ddd955e6e40ab85db6f5"
 	SuiEnv         = "https://sui-testnet-endpoint.blockvision.org"
 )
