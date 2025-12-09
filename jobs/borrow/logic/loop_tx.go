@@ -7,7 +7,6 @@ import (
 	"haedal-earn-borrow-server/common"
 	"log"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
@@ -110,7 +109,8 @@ func RpcApiRequest(nextCursor string) {
 		transactionTime := data.TimestampMs
 		transactions := data.Transaction.Data.Transaction.Transactions
 		for _, event := range data.Events {
-			eventType := strings.Replace(event.Type, PackageId, "", 1)
+			// eventType := strings.Replace(event.Type, PackageId, "", 1)
+			eventType := EventType(event.Type)
 			switch eventType {
 			case CreateMarketEvent:
 				InsertBorrow(event.ParsedJson, digest, transactionTime)
@@ -1442,6 +1442,8 @@ func InsertBorrowSupplyDetaliCollateral(parsedJson map[string]interface{}, diges
 	on_behalf_address := parsedJson["on_behalf"].(string)
 	market_id := parsedJson["market_id"].(string)
 	assets := parsedJson["assets"].(string)
+	collateralType := parsedJson["collateral_token_type"].(map[string]interface{})["name"].(string)
+	loanType := parsedJson["loan_token_type"].(map[string]interface{})["name"].(string)
 	con := common.GetDbConnection()
 	convRs, convErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
 	if convErr != nil {
@@ -1461,8 +1463,8 @@ func InsertBorrowSupplyDetaliCollateral(parsedJson map[string]interface{}, diges
 		return
 	}
 
-	sql := "insert into borrow_supply_detail(supply_type,market_id,caller_address,on_behalf_address,assets,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?)"
-	result, err := con.Exec(sql, 2, market_id, caller_address, on_behalf_address, assets, digest, transactionTimeUnix, transactionTime)
+	sql := "insert into borrow_supply_detail(supply_type,market_id,caller_address,on_behalf_address,assets,digest,transaction_time_unix,transaction_time,collateral_token_type,loan_token_type) value(?,?,?,?,?,?,?,?,?,?)"
+	result, err := con.Exec(sql, 2, market_id, caller_address, on_behalf_address, assets, digest, transactionTimeUnix, transactionTime, collateralType, loanType)
 	if err != nil {
 		log.Printf("borrow_supply_detail_collateral新增失败: %v", err)
 		defer con.Close()
@@ -1493,6 +1495,8 @@ func InsertBorrowSupplyDetali(parsedJson map[string]interface{}, digest string, 
 	market_id := parsedJson["market_id"].(string)
 	assets := parsedJson["assets"].(string)
 	shares := parsedJson["shares"].(string)
+	collateralType := parsedJson["collateral_token_type"].(map[string]interface{})["name"].(string)
+	loanType := parsedJson["loan_token_type"].(map[string]interface{})["name"].(string)
 	convRs, convErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
 	if convErr != nil {
 		log.Printf("转换失败：%v\n", convErr)
@@ -1513,8 +1517,8 @@ func InsertBorrowSupplyDetali(parsedJson map[string]interface{}, digest string, 
 		return
 	}
 
-	sql := "insert into borrow_supply_detail(supply_type,market_id,caller_address,on_behalf_address,assets,shares,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?)"
-	result, err := con.Exec(sql, 1, market_id, caller_address, on_behalf_address, assets, shares, digest, transactionTimeUnix, transactionTime)
+	sql := "insert into borrow_supply_detail(supply_type,market_id,caller_address,on_behalf_address,assets,shares,digest,transaction_time_unix,transaction_time,collateral_token_type,loan_token_type) value(?,?,?,?,?,?,?,?,?,?,?)"
+	result, err := con.Exec(sql, 1, market_id, caller_address, on_behalf_address, assets, shares, digest, transactionTimeUnix, transactionTime, collateralType, loanType)
 	if err != nil {
 		log.Printf("新增失败: %v", err)
 		defer con.Close()

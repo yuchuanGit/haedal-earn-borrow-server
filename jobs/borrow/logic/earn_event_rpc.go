@@ -184,7 +184,7 @@ func ExecuteDevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx 
 }
 
 func GetTotalAssetsParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, vaultObjectId string) ([]transaction.Argument, error) {
-	valutSharedObject, err := GetSharedObjectRef(ctx, cli, "0x53e1df5dc9a011c784106a1f8785b15048198a603ab363c14732fee3a100a42f", true)
+	valutSharedObject, err := GetSharedObjectRef(ctx, cli, vaultObjectId, true)
 	hearnSharedObject, err2 := GetSharedObjectRef(ctx, cli, HEarnObjectId, true)
 	if err != nil {
 		log.Printf("valutSharedObject fail:%v", err.Error())
@@ -485,7 +485,6 @@ func EventType(typeStr string) string {
 	parts := strings.Split(typeStr, "::")
 	if len(parts) > 1 {
 		// 拼接分割后的后续部分（从第一个::之后开始）
-
 		resultType = delimiter + strings.Join(parts[1:], delimiter)
 	} else {
 		log.Println("无" + delimiter + "分隔符")
