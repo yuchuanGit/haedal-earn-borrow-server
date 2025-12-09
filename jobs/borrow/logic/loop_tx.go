@@ -373,7 +373,7 @@ func InsertVaultSubmitmentFee(parsedJson map[string]interface{}, digest string) 
 	caller := parsedJson["caller"].(string)
 	fee_bps := parsedJson["fee_bps"].(string)
 	valid_at_ms := parsedJson["valid_at_ms"].(string)
-	event_type := parsedJson["event_type"].(string)
+	event_type := parsedJson["event_type"]
 	timestampMsUnix := parsedJson["timestamp_ms"].(string)
 	convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
 	if convErr != nil {
@@ -411,7 +411,7 @@ func InsertVaultSubmitPerformanceFee(parsedJson map[string]interface{}, digest s
 	caller := parsedJson["caller"].(string)
 	fee_bps := parsedJson["fee_bps"].(string)
 	valid_at_ms := parsedJson["valid_at_ms"].(string)
-	event_type := parsedJson["event_type"].(string)
+	event_type := parsedJson["event_type"]
 	timestampMsUnix := parsedJson["timestamp_ms"].(string)
 	convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
 	if convErr != nil {
@@ -738,7 +738,7 @@ func InsertVaultSubmitSupplyCap(parsedJson map[string]interface{}, digest string
 	caller := parsedJson["caller"].(string)
 	new_cap := parsedJson["new_cap"].(string)
 	valid_at_ms := parsedJson["valid_at_ms"].(string)
-	event_type := parsedJson["event_type"].(string)
+	event_type := parsedJson["event_type"]
 	timestampMsUnix := parsedJson["timestamp_ms"].(string)
 	convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
 	if convErr != nil {
@@ -812,7 +812,7 @@ func InsertVaultSubmitMarketRemoval(parsedJson map[string]interface{}, digest st
 	caller := parsedJson["caller"].(string)
 	market_id := parsedJson["market_id"].(string)
 	valid_at_ms := parsedJson["valid_at_ms"].(string)
-	event_type := parsedJson["event_type"].(string)
+	event_type := parsedJson["event_type"]
 	timestampMsUnix := parsedJson["timestamp_ms"].(string)
 	convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
 	if convErr != nil {
@@ -922,7 +922,7 @@ func InsertVaultSubmitGuardian(parsedJson map[string]interface{}, digest string)
 	caller := parsedJson["caller"].(string)
 	guardian := parsedJson["guardian"].(string)
 	valid_at_ms := parsedJson["valid_at_ms"].(string)
-	event_type := parsedJson["event_type"].(string)
+	event_type := parsedJson["event_type"]
 	timestampMsUnix := parsedJson["timestamp_ms"].(string)
 	convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
 	if convErr != nil {
@@ -960,7 +960,7 @@ func InsertVaultSubmitTimeLock(parsedJson map[string]interface{}, digest string)
 	caller := parsedJson["caller"].(string)
 	new_timelock_minutes := parsedJson["new_timelock_minutes"].(string)
 	valid_at_ms := parsedJson["valid_at_ms"].(string)
-	event_type := parsedJson["event_type"].(string)
+	event_type := parsedJson["event_type"]
 	timestampMsUnix := parsedJson["timestamp_ms"].(string)
 	convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
 	if convErr != nil {
