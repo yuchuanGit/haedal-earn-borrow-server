@@ -32,6 +32,7 @@ const (
 	SupplyCollateralEvent        = "::events::SupplyCollateralEvent"   //存抵押
 	BorrowEvent                  = "::events::BorrowEvent"             //借数量
 	RepayEvent                   = "::events::RepayEvent"              //还数量
+	WithdrawEvent                = "::events::WithdrawEvent"           //取资产
 	WithdrawCollateralEvent      = "::events::WithdrawCollateralEvent" //取抵押
 	AccrueInterestEvent          = "::events::AccrueInterestEvent"
 	VaultEvent                   = "::meta_vault_events::VaultEvent"                   //创建Vault
@@ -124,6 +125,8 @@ func RpcApiRequest(nextCursor string) {
 				InsertBorrowDetali(event.ParsedJson, digest, transactionTime)
 			case RepayEvent: //还
 				InsertBorrowRepayDetali(event.ParsedJson, digest, transactionTime)
+			case WithdrawEvent: //取资产
+				InsertBorroWithdraw(event.ParsedJson, digest, transactionTime)
 			case WithdrawCollateralEvent: // 取抵押
 				InsertBorroWithdrawCollateral(event.ParsedJson, digest, transactionTime)
 			case AccrueInterestEvent: //计利息
@@ -1104,7 +1107,7 @@ func InsertWithdrawSupplyQueue(parsedJson map[string]interface{}, digest string)
 	sql := "insert into vault_withdraw_queue(vault_id,caller,queue,timestamp_ms_unix,timestamp_ms,digest) value(?,?,?,?,?,?)"
 	result, err := con.Exec(sql, caller, vaultId, queueStr, timestampMsUnix, timestampMs, digest)
 	if err != nil {
-		log.Printf("vault_borrow_cap新增失败: %v", err)
+		log.Printf("vault_set_allocation_cap新增失败: %v", err)
 		defer con.Close()
 		return
 	}
@@ -1146,7 +1149,7 @@ func InsertVaultSupplyQueue(parsedJson map[string]interface{}, digest string) {
 	sql := "insert into vault_supply_queue(vault_id,caller,queue,timestamp_ms_unix,timestamp_ms,digest) value(?,?,?,?,?,?)"
 	result, err := con.Exec(sql, caller, vaultId, queueStr, timestampMsUnix, timestampMs, digest)
 	if err != nil {
-		log.Printf("vault_borrow_cap新增失败: %v", err)
+		log.Printf("vault_supply_queue新增失败: %v", err)
 		defer con.Close()
 		return
 	}
@@ -1168,9 +1171,9 @@ func SetAllocationCap(parsedJson map[string]interface{}, digest string) {
 	}
 	timestampMs := time.UnixMilli(convRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_borrow_cap where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from vault_set_allocation_cap where digest=?", digest)
 	if queryErr != nil {
-		log.Printf("vault_borrow_cap查询 digest失败: %v", queryErr)
+		log.Printf("vault_set_allocation_cap查询 digest失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
@@ -1181,15 +1184,15 @@ func SetAllocationCap(parsedJson map[string]interface{}, digest string) {
 		return
 	}
 
-	sql := "insert into vault_borrow_cap(market_id,vault_id,cap,weight_bps,caller,timestamp_ms_unix,timestamp_ms,digest) value(?,?,?,?,?,?,?,?)"
+	sql := "insert into vault_set_allocation_cap(market_id,vault_id,cap,weight_bps,caller,timestamp_ms_unix,timestamp_ms,digest) value(?,?,?,?,?,?,?,?)"
 	result, err := con.Exec(sql, marketId, vaultId, cap, weightBps, caller, timestampMsUnix, timestampMs, digest)
 	if err != nil {
-		log.Printf("vault_borrow_cap新增失败: %v", err)
+		log.Printf("vault_set_allocation_cap新增失败: %v", err)
 		defer con.Close()
 		return
 	}
 	lastInsertID, _ := result.LastInsertId()
-	log.Printf("vault_borrow_cap新增id：=%v", lastInsertID)
+	log.Printf("vault_set_allocation_cap新增id：=%v", lastInsertID)
 	defer con.Close()
 }
 
@@ -1308,6 +1311,44 @@ func InsertRateDetali(parsedJson map[string]interface{}, transactions []interfac
 		defer con.Close()
 	}
 
+}
+
+func InsertBorroWithdraw(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
+	market_id := parsedJson["market_id"].(string)
+	caller_address := parsedJson["caller"].(string)
+	on_behalf_address := parsedJson["on_behalf"].(string)
+	assets := parsedJson["assets"].(string)
+	shares := parsedJson["shares"].(string)
+	collateralType := parsedJson["collateral_token_type"].(map[string]interface{})["name"].(string)
+	loanlType := parsedJson["loan_token_type"].(map[string]interface{})["name"].(string)
+	convRs, convErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
+	if convErr != nil {
+		log.Printf("转换失败：%v\n", convErr)
+	}
+	transactionTime := time.UnixMilli(convRs)
+	con := common.GetDbConnection()
+	queryRs, queryErr := con.Query("select * from borrow_withdraw where digest=?", digest)
+	if queryErr != nil {
+		log.Printf("borrow_withdraw查询 digest失败: %v", queryErr)
+		defer con.Close()
+		return
+	}
+	if queryRs.Next() {
+		fmt.Printf("WithdrawEvent digest exist :%v\n", digest)
+		defer queryRs.Close() // 务必关闭结果集
+		defer con.Close()
+		return
+	}
+	sql := "insert into borrow_withdraw(market_id,caller,on_behalf,receiver,assets,shares,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?)"
+	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, assets, shares, collateralType, loanlType, digest, transactionTimeUnix, transactionTime)
+	if err != nil {
+		log.Printf("borrow_withdraw新增失败: %v", err)
+		defer con.Close()
+		return
+	}
+	lastInsertID, _ := result.LastInsertId()
+	log.Printf("borrow_withdraw新增id：=%v", lastInsertID)
+	defer con.Close() // 程序退出时关闭数据库连接
 }
 
 func InsertBorroWithdrawCollateral(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
