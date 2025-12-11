@@ -29,14 +29,15 @@ const (
 )
 
 const (
-	CreateMarketEvent            = "::events::CreateMarketEvent"       //创建Market
-	SupplyEvent                  = "::events::SupplyEvent"             //存数量
-	SupplyCollateralEvent        = "::events::SupplyCollateralEvent"   //存抵押
-	BorrowEvent                  = "::events::BorrowEvent"             //借数量
-	RepayEvent                   = "::events::RepayEvent"              //还数量
-	WithdrawEvent                = "::events::WithdrawEvent"           //取资产
-	WithdrawCollateralEvent      = "::events::WithdrawCollateralEvent" //取抵押
-	AccrueInterestEvent          = "::events::AccrueInterestEvent"
+	CreateMarketEvent            = "::events::CreateMarketEvent"                       //创建Market
+	SupplyEvent                  = "::events::SupplyEvent"                             //存数量
+	SupplyCollateralEvent        = "::events::SupplyCollateralEvent"                   //存抵押
+	BorrowEvent                  = "::events::BorrowEvent"                             //借数量
+	RepayEvent                   = "::events::RepayEvent"                              //还数量
+	WithdrawEvent                = "::events::WithdrawEvent"                           //取资产
+	WithdrawCollateralEvent      = "::events::WithdrawCollateralEvent"                 //取抵押
+	AccrueInterestEvent          = "::events::AccrueInterestEvent"                     //计利息
+	BorrowRateUpdateEvent        = "::events::BorrowRateUpdateEvent"                   //借款利率更新
 	VaultEvent                   = "::meta_vault_events::VaultEvent"                   //创建Vault
 	SetAllocationEvent           = "::meta_vault_events::SetAllocationEvent"           //设置Borrow cap
 	SetSupplyQueueEvent          = "::meta_vault_events::SetSupplyQueueEvent"          //设置存款队列，Vault和Market相关联
@@ -133,10 +134,47 @@ func RpcApiRequest(nextCursor string) {
 				InsertBorroWithdrawCollateral(event.ParsedJson, digest, transactionTime)
 			case AccrueInterestEvent: //计利息
 				InsertRateDetali(event.ParsedJson, transactions, digest, transactionTime)
+			case BorrowRateUpdateEvent: //	借款利率更新
+				InsertBorrowRateUpdate(event.ParsedJson, digest, transactionTime)
 			}
 		}
 	}
 	RpcApiRequest(resp.NextCursor)
+}
+
+func InsertBorrowRateUpdate(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
+	market_id := parsedJson["market_id"].(string)
+	avg_borrow_rate := parsedJson["avg_borrow_rate"]
+	rate_at_target := parsedJson["rate_at_target"]
+
+	convRs, convErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
+	if convErr != nil {
+		log.Printf("转换失败：%v\n", convErr)
+	}
+	transactionTime := time.UnixMilli(convRs)
+	con := common.GetDbConnection()
+	queryRs, queryErr := con.Query("select * from borrow_rate_update where digest=?", digest)
+	if queryErr != nil {
+		log.Printf("borrow_rate_update查询 digest失败: %v", queryErr)
+		defer con.Close()
+		return
+	}
+	if queryRs.Next() {
+		fmt.Printf("BorrowRateUpdateEvent digest exist :%v\n", digest)
+		defer queryRs.Close() // 务必关闭结果集
+		defer con.Close()
+		return
+	}
+	sql := "insert into borrow_rate_update(market_id,avg_borrow_rate,rate_at_target,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?)"
+	result, err := con.Exec(sql, market_id, avg_borrow_rate, rate_at_target, digest, transactionTimeUnix, transactionTime)
+	if err != nil {
+		log.Printf("borrow_rate_update新增失败: %v", err)
+		defer con.Close()
+		return
+	}
+	lastInsertID, _ := result.LastInsertId()
+	log.Printf("borrow_rate_update新增id：=%v", lastInsertID)
+	defer con.Close() // 程序退出时关闭数据库连接
 }
 
 func InsertVaultRebalance(parsedJson map[string]interface{}, digest string) {
