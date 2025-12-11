@@ -220,7 +220,7 @@ func GetTotalAssetsParameter(cli sui.ISuiAPI, ctx context.Context, tx transactio
 
 type VaultModel struct {
 	VaultId       string
-	VaultName     string
+	VaultName     *string
 	AssetType     string
 	HtokenType    string
 	AssetDecimals float64 //存入精度
@@ -251,7 +251,8 @@ func QueryVaultInfoUpdate(vaultId string) {
 			var vm VaultModel
 			vm.VaultId = vaultId
 			fields := resp.Data.Content.Fields
-			vm.VaultName = fields["vault_name"].(string)
+			vault_name, _ := fields["vault_name"].(string)
+			vm.VaultName = &vault_name
 			vm.AssetDecimals = fields["asset_decimals"].(float64) //存入精度
 			vm.TotalShares = fields["total_shares"].(string)      //存入总的份额
 			// vm.TotalShares = fmt.Sprintf("%.0f", total_shares)

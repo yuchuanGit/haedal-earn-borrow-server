@@ -1233,6 +1233,27 @@ func InsertVault(parsedJson map[string]interface{}, digest string, transactionTi
 	}
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("vault新增id：=%v", lastInsertID)
+	isInsertTask := true
+	taskRs, taskErr := con.Query("select * from scheduled_task_record where input_object_id=?", vault_id)
+	if taskErr != nil {
+		log.Printf("scheduled_task_record查询 input_object_id失败: %v", taskErr)
+		defer con.Close()
+		return
+	}
+	if taskRs.Next() {
+		isInsertTask = false
+	}
+	if isInsertTask {
+		sqlTask := "insert into scheduled_task_record(timing_type,input_object_id,execution_completed)"
+		resultTask, errTask := con.Exec(sqlTask, 2, vault_id, 0)
+		if errTask != nil {
+			log.Printf("VaultEvent scheduled_task_record 新增失败: %v", errTask)
+			defer con.Close()
+			return
+		}
+		taskLastInsertID, _ := resultTask.LastInsertId()
+		log.Printf("scheduled_task_record新增id：=%v", taskLastInsertID)
+	}
 	defer con.Close()
 }
 
@@ -1395,6 +1416,8 @@ func InsertBorrowRepayDetali(parsedJson map[string]interface{}, digest string, t
 	on_behalf_address := parsedJson["on_behalf"].(string)
 	assets := parsedJson["assets"].(string)
 	shares := parsedJson["shares"].(string)
+	collateral_token_type := parsedJson["collateral_token_type"].(map[string]interface{})["name"].(string)
+	loan_token_type := parsedJson["loan_token_type"].(map[string]interface{})["name"].(string)
 	convRs, convErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
 	if convErr != nil {
 		log.Printf("转换失败：%v\n", convErr)
@@ -1414,8 +1437,8 @@ func InsertBorrowRepayDetali(parsedJson map[string]interface{}, digest string, t
 		return
 	}
 
-	sql := "insert into borrow_repay_detail(market_id,caller_address,on_behalf_address,assets,shares,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?)"
-	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, assets, shares, digest, transactionTimeUnix, transactionTime)
+	sql := "insert into borrow_repay_detail(market_id,caller_address,on_behalf_address,assets,shares,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
+	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, assets, shares, collateral_token_type, loan_token_type, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("borrow_repay_detail新增失败: %v", err)
 		defer con.Close()
@@ -1433,6 +1456,8 @@ func InsertBorrowDetali(parsedJson map[string]interface{}, digest string, transa
 	receiver_address := parsedJson["receiver"].(string)
 	assets := parsedJson["assets"].(string)
 	shares := parsedJson["shares"].(string)
+	collateral_token_type := parsedJson["collateral_token_type"].(map[string]interface{})["name"].(string)
+	loan_token_type := parsedJson["loan_token_type"].(map[string]interface{})["name"].(string)
 	convRs, convErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
 	if convErr != nil {
 		log.Printf("转换失败：%v\n", convErr)
@@ -1452,8 +1477,8 @@ func InsertBorrowDetali(parsedJson map[string]interface{}, digest string, transa
 		return
 	}
 
-	sql := "insert into borrow_detail(market_id,caller_address,on_behalf_address,receiver_address,assets,shares,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?)"
-	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, receiver_address, assets, shares, digest, transactionTimeUnix, transactionTime)
+	sql := "insert into borrow_detail(market_id,caller_address,on_behalf_address,receiver_address,assets,shares,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?)"
+	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, receiver_address, assets, shares, collateral_token_type, loan_token_type, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("borrow_detail新增失败: %v", err)
 		defer con.Close()
