@@ -1117,7 +1117,6 @@ func InsertWithdrawSupplyQueue(parsedJson map[string]interface{}, digest string)
 }
 
 func InsertVaultSupplyQueue(parsedJson map[string]interface{}, digest string) {
-	utils.PrettyPrint(parsedJson)
 	vaultId := parsedJson["vault_id"].(string)
 	caller := parsedJson["caller"].(string)
 	queue := parsedJson["queue"].([]interface{})
@@ -1234,6 +1233,7 @@ func InsertVault(parsedJson map[string]interface{}, digest string, transactionTi
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("vault新增id：=%v", lastInsertID)
 	isInsertTask := true
+	log.Printf("isInsertTask：=%v", isInsertTask)
 	taskRs, taskErr := con.Query("select * from scheduled_task_record where input_object_id=?", vault_id)
 	if taskErr != nil {
 		log.Printf("scheduled_task_record查询 input_object_id失败: %v", taskErr)
@@ -1241,10 +1241,11 @@ func InsertVault(parsedJson map[string]interface{}, digest string, transactionTi
 		return
 	}
 	if taskRs.Next() {
+		log.Printf("1111111=%v", isInsertTask)
 		isInsertTask = false
 	}
 	if isInsertTask {
-		sqlTask := "insert into scheduled_task_record(timing_type,input_object_id,execution_completed)"
+		sqlTask := "insert into scheduled_task_record(timing_type,input_object_id,execution_completed) value(?,?,?)"
 		resultTask, errTask := con.Exec(sqlTask, 2, vault_id, 0)
 		if errTask != nil {
 			log.Printf("VaultEvent scheduled_task_record 新增失败: %v", errTask)
