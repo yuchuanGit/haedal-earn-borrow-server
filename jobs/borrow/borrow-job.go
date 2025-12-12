@@ -18,7 +18,7 @@ func startJob() {
 	c := cron.New(cron.WithSeconds())
 
 	// 添加定时任务（每 1 分钟执行一次）
-	_, err := c.AddFunc("0 */1 * * * *", func() {
+	_, err := c.AddFunc("*/2 * * * * *", func() {
 		fmt.Println("cron 任务执行：", time.Now().Format("15:04:05.000"))
 		logic.UpdateMarketRate()
 		// logic.GetMarketInfo()
