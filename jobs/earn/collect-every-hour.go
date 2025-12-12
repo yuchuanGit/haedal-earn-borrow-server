@@ -15,7 +15,7 @@ func main() {
 func startJob() {
 	c := cron.New(cron.WithSeconds())
 	// 添加定时任务（每 1小时秒执行一次）
-	_, err := c.AddFunc("0 0 */1 * * *", func() {
+	_, err := c.AddFunc("0 */2 * * * *", func() {
 		fmt.Println("collect-every-hour cron 任务执行：", time.Now().Format("15:04:05.000"))
 		logic.VaultAllLoopExecuteMove()
 	})

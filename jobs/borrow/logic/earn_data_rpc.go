@@ -2,8 +2,12 @@ package logic
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"haedal-earn-borrow-server/common"
 	"log"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -72,7 +76,8 @@ func ExecuteMoveInsertVaultYieldEarned(vaultInfo VaultModel, failRetryCount int)
 			exchangeRate = val.String()
 		}
 		if exchangeRate != "0" {
-			InsertVaultExchangeRate(vaultInfo.VaultId, exchangeRate)
+			InsertVaultExchangeRate(vaultInfo.VaultId, vaultInfo.AssetDecimals, exchangeRate)
+			InsertVaultApy(vaultInfo.VaultId, exchangeRate)
 		}
 	} else {
 		ExecuteMoveUpdateVaultYieldEarnedFailRetry(vaultInfo, failRetryCount)
@@ -86,10 +91,13 @@ func ExecuteMoveUpdateVaultYieldEarnedFailRetry(vaultInfo VaultModel, failRetryC
 	}
 }
 
-func InsertVaultExchangeRate(vaultId string, exchangeRate string) {
+func InsertVaultExchangeRate(vaultId string, asset_decimals float64, exchangeRate string) {
 	con := common.GetDbConnection()
 	sql := "insert into vault_exchange_rate(vault_id,exchange_rate,transaction_time) value(?,?,?)"
-	result, err := con.Exec(sql, vaultId, exchangeRate, time.Now())
+	exchangeRateF, _ := strconv.ParseFloat(exchangeRate, 64)
+	powResult := math.Pow(10, asset_decimals+6)
+	val := powResult / exchangeRateF
+	result, err := con.Exec(sql, vaultId, fmt.Sprintf("%.0f", val), time.Now())
 	if err != nil {
 		log.Printf("vault_exchange_rate新增失败: %v", err)
 		defer con.Close()
@@ -98,6 +106,56 @@ func InsertVaultExchangeRate(vaultId string, exchangeRate string) {
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("vault_exchange_rate新增id：=%v", lastInsertID)
 	defer con.Close()
+}
+
+func InsertVaultApy(vaultId string, exchangeRate string) {
+	var preApy VaultApyModel
+	con := common.GetDbConnection()
+	querySql := "SELECT id,vault_id,exchange_rate,apy,transaction_time from vault_apy where  transaction_time=(SELECT max(transaction_time) previousTime from vault_apy where vault_id=?)"
+	queryErr := con.QueryRow(querySql, vaultId).Scan(&preApy.Id, &preApy.VaultId, &preApy.ExchangeRate, &preApy.Apy, &preApy.TransactionTime)
+	exchangeRateF, _ := strconv.ParseFloat(exchangeRate, 64)
+	currentNow := time.Now()
+	yearApy := 0.00
+	if QueryRowIsValue(queryErr) {
+		preExchangeRateF, _ := strconv.ParseFloat(preApy.ExchangeRate, 64)
+		differenceInSeconds := currentNow.Unix() - preApy.TransactionTime.Unix()                            //上一次采集和当前采集相差秒
+		perSecondApy := ((preExchangeRateF - exchangeRateF) / exchangeRateF) / float64(differenceInSeconds) //每秒apy
+		yearApy = perSecondApy * 60 * 60 * 24 * 365
+	}
+	sql := "insert into vault_apy(vault_id,exchange_rate,apy,transaction_time) value(?,?,?,?)"
+	result, err := con.Exec(sql, vaultId, exchangeRate, yearApy, time.Now())
+	if err != nil {
+		log.Printf("vault_apy新增失败: %v", err)
+		defer con.Close()
+		return
+	}
+	lastInsertID, _ := result.LastInsertId()
+	log.Printf("vault_apy新增id：=%v", lastInsertID)
+	defer con.Close()
+}
+
+func QueryRowIsValue(err error) bool {
+	switch {
+	case err == sql.ErrNoRows:
+		// 无数据场景：正常业务逻辑（如返回空、创建默认值等）
+		log.Println("未查询到数据")
+		return false
+	case err != nil:
+		// 其他错误：如SQL语法错误、字段类型不匹配、连接异常等
+		log.Printf("查询失败：%v\n", err)
+		return false
+	default:
+		// 查询成功：处理数据
+		return true
+	}
+}
+
+type VaultApyModel struct {
+	Id              int
+	VaultId         string
+	Apy             string
+	ExchangeRate    string
+	TransactionTime time.Time
 }
 
 func GetYieldEarnedParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, vaultObjectId string) ([]transaction.Argument, error) {
@@ -138,7 +196,7 @@ func GetYieldEarnedParameter(cli sui.ISuiAPI, ctx context.Context, tx transactio
 func QueryVaultAll() []VaultModel {
 	var vms []VaultModel
 	con := common.GetDbConnection()
-	sql := "select vault_id,vault_name,asset_type,htoken_type from vault "
+	sql := "select vault_id,vault_name,asset_type,htoken_type,asset_decimals from vault "
 	rs, err := con.Query(sql)
 	if err != nil {
 		log.Printf("QueryVaultAll 查询失败: %v", err)
@@ -147,7 +205,7 @@ func QueryVaultAll() []VaultModel {
 	}
 	for rs.Next() {
 		var vm VaultModel
-		errScan := rs.Scan(&vm.VaultId, &vm.VaultName, &vm.AssetType, &vm.HtokenType)
+		errScan := rs.Scan(&vm.VaultId, &vm.VaultName, &vm.AssetType, &vm.HtokenType, &vm.AssetDecimals)
 		if errScan != nil {
 			log.Printf("QueryVaultAll scan失败: %v", err)
 			defer con.Close()
