@@ -18,7 +18,7 @@ func startEventJob() {
 	c := cron.New(cron.WithSeconds())
 
 	// 添加定时任务（每 10 秒执行一次）
-	_, err := c.AddFunc("*/2 * * * * *", func() {
+	_, err := c.AddFunc("*/10 * * * * *", func() {
 		fmt.Println("event cron 任务执行：", time.Now().Format("15:04:05.000"))
 		nextCursor := logic.QueryEventsCursor()
 		logic.RpcApiRequest(nextCursor)

@@ -294,16 +294,26 @@ func VaultInfoUpdate(vm VaultModel) {
 
 func ScanVaultEvent() {
 	jobTasks := QueryVaultExecutionInputObjectId()
-	if len(jobTasks) == 1 {
-		fmt.Printf("ScanVaultEvent最后一条：%v\n", jobTasks[0].InputObjectId)
-		RpcRequestScanVaultEvent(jobTasks[0], true)
-		QueryVaultInfoUpdate(jobTasks[0].InputObjectId)
-		ExecuteMoveUpdateVaultTotalAsset(jobTasks[0].InputObjectId)
-	} else if len(jobTasks) > 1 {
-		RpcRequestScanVaultEvent(jobTasks[0], false)
-		QueryVaultInfoUpdate(jobTasks[0].InputObjectId)
-		ExecuteMoveUpdateVaultTotalAsset(jobTasks[0].InputObjectId)
+	isFinalTask := false
+	lastIdx := len(jobTasks) - 1
+	for idx, jobTask := range jobTasks {
+		if idx == lastIdx {
+			isFinalTask = true
+		}
+		RpcRequestScanVaultEvent(jobTask, isFinalTask)
+		QueryVaultInfoUpdate(jobTask.InputObjectId)
+		ExecuteMoveUpdateVaultTotalAsset(jobTask.InputObjectId)
 	}
+	// if len(jobTasks) == 1 {
+	// 	fmt.Printf("ScanVaultEvent最后一条：%v\n", jobTasks[0].InputObjectId)
+	// 	RpcRequestScanVaultEvent(jobTasks[0], true)
+	// 	QueryVaultInfoUpdate(jobTasks[0].InputObjectId)
+	// 	ExecuteMoveUpdateVaultTotalAsset(jobTasks[0].InputObjectId)
+	// } else if len(jobTasks) > 1 {
+	// 	RpcRequestScanVaultEvent(jobTasks[0], false)
+	// 	QueryVaultInfoUpdate(jobTasks[0].InputObjectId)
+	// 	ExecuteMoveUpdateVaultTotalAsset(jobTasks[0].InputObjectId)
+	// }
 }
 
 func RpcRequestScanVaultEvent(jobInfo ScheduledTaskRecord, isFinalTask bool) {
@@ -447,8 +457,10 @@ func EventsCursorUpdateById(digest string, id int) {
 func QueryVaultExecutionInputObjectId() []ScheduledTaskRecord {
 	var jobTasks []ScheduledTaskRecord
 	con := common.GetDbConnection()
-	sql := "SELECT id,digest,input_object_id from scheduled_task_record where timing_type=? and execution_completed=?  limit 2"
-	rs, err := con.Query(sql, ScheduledTaskTypeVault, false)
+	// sql := "SELECT id,digest,input_object_id from scheduled_task_record where timing_type=? and execution_completed=?"
+	// rs, err := con.Query(sql, ScheduledTaskTypeVault, false)
+	sql := "SELECT id,digest,input_object_id from scheduled_task_record where timing_type=?"
+	rs, err := con.Query(sql, ScheduledTaskTypeVault)
 	if err != nil {
 		fmt.Printf("QueryVaultExecutionInputObjectId 查询borrow失败：%v\n", err.Error())
 		defer con.Close()

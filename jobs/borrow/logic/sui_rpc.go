@@ -34,7 +34,7 @@ func UpdateBorrowInfo() {
 
 func UpdateMarketRate() {
 	con := common.GetDbConnection()
-	sql := "SELECT market_id from borrow where scheduled_execution=0 limit 2"
+	sql := "SELECT market_id from borrow where scheduled_execution=0"
 	rs, err := con.Query(sql)
 	if err != nil {
 		fmt.Printf("UpdateMarketRate 查询borrow失败：%v\n", err.Error())
@@ -47,25 +47,29 @@ func UpdateMarketRate() {
 		rs.Scan(&marketId)
 		marketIds = append(marketIds, marketId)
 	}
-	if len(marketIds) == 1 {
-		fmt.Printf("最后一条：%v\n", marketIds[0])
-		UpdateBorrowRate(marketIds[0], con)
-		upSql := "update borrow set scheduled_execution=0"
-		_, upErr := con.Exec(upSql)
-		if upErr != nil {
-			fmt.Printf("UpdateMarketRate borrow scheduled_execution=0失败：%v\n", upErr.Error())
+	lastIdx := len(marketIds) - 1
+	for idx, marketId := range marketIds {
+		UpdateBorrowRate(marketId, con)
+		if idx == lastIdx {
+			upSql := "update borrow set scheduled_execution=0"
+			_, upErr := con.Exec(upSql)
+			if upErr != nil {
+				fmt.Printf("UpdateMarketRate borrow scheduled_execution=0失败：%v\n", upErr.Error())
+			}
 		}
-	} else if len(marketIds) > 1 {
-		UpdateBorrowRate(marketIds[0], con)
 	}
-	defer con.Close()
-	// marketInfo := GetMarketInfo()
-	// if len(marketInfo) > 0 {
-	// 	supplyRate := marketInfo[2]
-	// 	borrowRate := marketInfo[3]
-	// 	log.Printf("supplyRate=%v", supplyRate)
-	// 	log.Printf("borrowRate=%v", borrowRate)
+	// if len(marketIds) == 1 {
+	// 	fmt.Printf("最后一条：%v\n", marketIds[0])
+	// 	UpdateBorrowRate(marketIds[0], con)
+	// 	upSql := "update borrow set scheduled_execution=0"
+	// 	_, upErr := con.Exec(upSql)
+	// 	if upErr != nil {
+	// 		fmt.Printf("UpdateMarketRate borrow scheduled_execution=0失败：%v\n", upErr.Error())
+	// 	}
+	// } else if len(marketIds) > 1 {
+	// 	UpdateBorrowRate(marketIds[0], con)
 	// }
+	defer con.Close()
 }
 
 func bigIntToFloat64(bi big.Int) (float64, bool) {
