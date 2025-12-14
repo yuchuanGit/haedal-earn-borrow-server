@@ -1733,14 +1733,14 @@ func SetAllocationCap(parsedJson map[string]interface{}, digest string, transact
 	transactionTime := time.UnixMilli(ttConvRs)
 
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_set_allocation_cap where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from vault_set_allocation_cap where digest=? and market_id=?", digest, marketId)
 	if queryErr != nil {
 		log.Printf("vault_set_allocation_cap查询 digest失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("SetAllocationCapEvent digest exist :%v\n", digest)
+		fmt.Printf("SetAllocationCapEvent digest+marketId exist :%v,%v\n", digest, marketId)
 		defer queryRs.Close()
 		defer con.Close()
 		return
