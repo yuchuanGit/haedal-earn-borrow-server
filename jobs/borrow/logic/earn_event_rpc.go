@@ -103,14 +103,14 @@ func ExecuteMoveUpdateVaultTotalAsset(vaultId string) {
 	funcName := "get_total_assets"
 	moveCallReturn := ExecuteDevInspectTransactionBlock(cli, ctx, *tx, moduleName, funcName, typeArguments, arguments)
 	if len(moveCallReturn) > 0 {
-		totalAsset := "0"
+		totalAsset := "-1"
 		for _, returnValue := range moveCallReturn[0].ReturnValues {
 			bcsBytes, _ := anyToBytes(returnValue.([]any)[0])
 			deserializer := bcs.NewDeserializer(bcsBytes)
 			val := deserializer.U128()
 			totalAsset = val.String()
 		}
-		if totalAsset != "0" {
+		if totalAsset != "-1" {
 			UpdateVaultTotalAsset(totalAsset, vaultId)
 		}
 	}

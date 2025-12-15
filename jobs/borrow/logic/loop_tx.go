@@ -25,7 +25,8 @@ const (
 	PackageId      = "0xa6397390685ea1dbba886433d00cb26da2bbb986408dc6599eb18579d9e5a5b2" //12-12 14:00
 	HEarnObjectId  = "0x491d7fd420ac60a7618484880a47865ea46165c861628c208318ad3774b7a6d8"
 	SuiUserAddress = "0x438796b44e606f8768c925534ebb87be9ded13cc51a6ddd955e6e40ab85db6f5"
-	SuiEnv         = "https://sui-testnet-endpoint.blockvision.org"
+	// SuiEnv         = "https://sui-testnet-endpoint.blockvision.org"
+	SuiEnv = "https://fullnode.testnet.sui.io:443"
 )
 
 const (
