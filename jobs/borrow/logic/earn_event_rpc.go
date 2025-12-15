@@ -189,6 +189,8 @@ func ExecuteDevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx 
 func GetTotalAssetsParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, vaultObjectId string) ([]transaction.Argument, error) {
 	valutSharedObject, err := GetSharedObjectRef(ctx, cli, vaultObjectId, true)
 	hearnSharedObject, err2 := GetSharedObjectRef(ctx, cli, HEarnObjectId, true)
+	log.Printf("vaultObjectId=%v\n", vaultObjectId)
+	log.Printf("HEarnObjectId=%v\n", HEarnObjectId)
 	if err != nil {
 		log.Printf("valutSharedObject fail:%v", err.Error())
 		return nil, err
@@ -247,7 +249,7 @@ func QueryVaultInfoUpdate(vaultId string) {
 	}
 	resp, err := cli.SuiGetObject(ctx, reqParams)
 	if err != nil {
-		fmt.Printf("RpcApiRequest SuiGetObject err:%v\n", err)
+		fmt.Printf("QueryVaultInfoUpdate SuiGetObject err:%v\n", err)
 	}
 	if resp.Data != nil {
 		if resp.Data.Content != nil {
@@ -269,10 +271,10 @@ func QueryVaultInfoUpdate(vaultId string) {
 			}
 			VaultInfoUpdate(vm)
 		} else {
-			fmt.Printf("RpcApiRequest SuiGetObject resp.Data.Content:%v\n", resp.Data.Content)
+			fmt.Printf("QueryVaultInfoUpdate SuiGetObject resp.Data.Content:%v\n", resp.Data.Content)
 		}
 	} else {
-		fmt.Printf("RpcApiRequest SuiGetObject resp.Data:%v\n", resp.Data)
+		fmt.Printf("QueryVaultInfoUpdate SuiGetObject resp.Data:%v\n", resp.Data)
 	}
 
 	// res.Data.Content.Fields
@@ -485,7 +487,7 @@ type ScheduledTaskRecord struct {
 
 func EventRpcRequest(req models.SuiXQueryTransactionBlocksRequest) models.SuiXQueryTransactionBlocksResponse {
 	var response models.SuiXQueryTransactionBlocksResponse
-	cli := sui.NewSuiClient(SuiEnv)
+	cli := sui.NewSuiClient(SuiBlockvisionEnv)
 	ctx := context.Background()
 	resp, err := cli.SuiXQueryTransactionBlocks(ctx, req)
 	if err != nil {
