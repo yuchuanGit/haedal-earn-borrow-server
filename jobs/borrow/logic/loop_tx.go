@@ -22,7 +22,9 @@ const (
 	// HEarnObjectId  = "0x42cbdc7214c46b55096fd76f9bed12382dd68216ec5147cd18624ff539dff04e"
 	// PackageId      = "0x3746d5bebba155df504b352c16cf91f92d7b23042256be85338938b4c8fc8a53" //12-11 17:00
 	// HEarnObjectId  = "0xc4cf77c655e2c6f0d9482bdff1a01094145fe0649b401d36ebccb8690dcbcb4c"
-	PackageId         = "0xa6397390685ea1dbba886433d00cb26da2bbb986408dc6599eb18579d9e5a5b2" //12-12 14:00
+	// PackageId         = "0xa6397390685ea1dbba886433d00cb26da2bbb986408dc6599eb18579d9e5a5b2" //12-12 14:00
+	// HEarnObjectId     = "0x491d7fd420ac60a7618484880a47865ea46165c861628c208318ad3774b7a6d8"
+	PackageId         = "0xa6397390685ea1dbba886433d00cb26da2bbb986408dc6599eb18579d9e5a5b2" //12-16 11:00
 	HEarnObjectId     = "0x491d7fd420ac60a7618484880a47865ea46165c861628c208318ad3774b7a6d8"
 	SuiUserAddress    = "0x438796b44e606f8768c925534ebb87be9ded13cc51a6ddd955e6e40ab85db6f5"
 	SuiBlockvisionEnv = "https://sui-testnet-endpoint.blockvision.org"
