@@ -19,17 +19,164 @@ import (
 )
 
 func UpdateBorrowInfo() {
+	var loanUsers []LoanUserInfo
 	con := common.GetDbConnection()
-	sql := "SELECT * from borrow where scheduled_execution=0"
+	sql := "SELECT loanUser.market_id,loanUser.caller_address, " +
+		"ccc.feed_object_id as collateralFeedObjectId,ccl.feed_object_id as loanFeedObjectId, " +
+		"from (SELECT market_id,caller_address,max(collateral_token_type) collateral_token_type, max(loan_token_type) loan_token_type from borrow_detail GROUP BY caller_address,market_id) loanUser " +
+		"left join coin_config ccc on ccc.coin_type=loanUser.collateral_token_type " +
+		"left join coin_config ccl on ccl.coin_type=loanUser.loan_token_type "
 	rs, err := con.Query(sql)
 	if err != nil {
-		// fmt.Errorf(err.Error()
+		fmt.Printf(" 查询borrow_detail失败：%v\n", err.Error())
+		defer con.Close()
 		return
 	}
 	for rs.Next() {
+		var userInfo LoanUserInfo
+		rs.Scan(&userInfo.MarketId, &userInfo.UserAddress, &userInfo.CollateralFeedObjectId, &userInfo.LoanFeedObjectId)
+		loanUsers = append(loanUsers, userInfo)
+	}
+	if len(loanUsers) > 0 {
+		cli := sui.NewSuiClient(SuiEnv)
+		ctx := context.Background()
+		tx := transaction.NewTransaction()
+		tx.SetSuiClient(cli.(*sui.Client))
+		tx.SetSender(models.SuiAddress(SuiUserAddress))
+		userAddress := loanUsers[0]
+		arguments, parameErr := userPositionInfoParameter(cli, ctx, *tx, userAddress)
+		if parameErr != nil {
+			return
+		}
+		moduleName := "market"
+		funcName := "user_position_info"
+		typeArguments := []transaction.TypeTag{}
+		moveCallReturn := ExecuteDevInspectTransactionBlock(cli, ctx, *tx, moduleName, funcName, typeArguments, arguments)
+		if len(moveCallReturn) > 0 {
+			for _, returnValue := range moveCallReturn[0].ReturnValues {
+				bcsBytes, _ := anyToBytes(returnValue.([]any)[0])
+				deserializer := bcs.NewDeserializer(bcsBytes)
+				var userPosition UserPositionInfo
+				if err := userPosition.UnmarshalBCS(deserializer); err != nil {
+					panic(fmt.Sprintf("解析 UserPositionInfo 失败：%v", err))
+				}
+				// exchangeRate = val.String()
+			}
+		}
 
 	}
 	defer con.Close()
+}
+
+type LoanUserInfo struct {
+	MarketId               uint64
+	UserAddress            string
+	CollateralFeedObjectId string
+	LoanFeedObjectId       string
+}
+
+type UserPositionInfo struct {
+	MarketId                  uint64  `bcs:"market_id"`
+	Collateral                big.Int `bcs:"collateral"`                  // User's collateral amount
+	BorrowShares              big.Int `bcs:"borrow_shares"`               // User's borrow shares
+	BorrowAssets              big.Int `bcs:"borrow_assets"`               // User's borrow assets (converted from shares)
+	SupplyShares              big.Int `bcs:"supply_shares"`               // User's supply shares
+	SupplyAssets              big.Int `bcs:"supply_assets"`               // User's supply assets (converted from shares)
+	HealthFactor              big.Int `bcs:"health_factor"`               // Health factor (WAD precision, < 1e18 means liquidatable)
+	WithdrawableAssets        big.Int `bcs:"withdrawable_assets"`         // Maximum withdrawable supply assets
+	MaxBorrowable             big.Int `bcs:"max_borrowable"`              // Maximum borrowable amount
+	MaxWithdrawableCollateral big.Int `bcs:"max_withdrawable_collateral"` // Maximum withdrawable collateral without breaching LLTV
+}
+
+func (m *UserPositionInfo) UnmarshalBCS(d *bcs.Deserializer) error {
+	var u UserPositionInfo
+	u.MarketId = d.U64()
+	u.Collateral = d.U128()
+	u.BorrowShares = d.U128()
+	u.BorrowAssets = d.U128()
+	u.SupplyShares = d.U128()
+	u.SupplyAssets = d.U128()
+	u.HealthFactor = d.U128()
+	u.WithdrawableAssets = d.U128()
+	u.MaxBorrowable = d.U128()
+	u.MaxWithdrawableCollateral = d.U128()
+	return nil
+}
+
+func userPositionInfoParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction,
+	userInfo LoanUserInfo) ([]transaction.Argument, error) {
+	hearnSharedObject, err := GetSharedObjectRef(ctx, cli, HEarnObjectId, true)
+	oracleSharedObject, err4 := GetSharedObjectRef(ctx, cli, OracleObjectId, true)
+	suppplyCollateralFeedSharedObject, err5 := GetSharedObjectRef(ctx, cli, userInfo.CollateralFeedObjectId, true)
+	loanFeedSharedObject, err6 := GetSharedObjectRef(ctx, cli, userInfo.LoanFeedObjectId, true)
+	clockSharedObject, err7 := GetSharedObjectRef(ctx, cli, "0x6", true)
+	if err != nil {
+		log.Printf("userPositionInfo hearnSharedObject parameter 1 fail:%v", err.Error())
+		return nil, err
+	}
+	if err4 != nil {
+		log.Printf("userPositionInfo oracleSharedObject parameter 4 fail:%v", err4.Error())
+		return nil, err4
+	}
+	if err5 != nil {
+		log.Printf("userPositionInfo suppplyCollateralFeedSharedObject parameter 5 fail:%v", err5.Error())
+		return nil, err5
+	}
+	if err6 != nil {
+		log.Printf("userPositionInfo loanFeedSharedObject parameter 6 fail:%v", err6.Error())
+		return nil, err6
+	}
+	if err7 != nil {
+		log.Printf("userPositionInfo clockSharedObject parameter 7 fail:%v", err7.Error())
+		return nil, err7
+	}
+	arguments := []transaction.Argument{
+		// 第一个参数：&Hear 对象
+		tx.Object(
+			transaction.CallArg{
+				Object: &transaction.ObjectArg{
+					SharedObject: hearnSharedObject,
+				},
+			},
+		),
+		// 第二个参数：market_id
+		tx.Pure(userInfo.MarketId),
+		// 第三个参数：owner
+		tx.Pure(userInfo.UserAddress),
+		// 第四个参数：&pyth_oracle::Oracle 对象
+		tx.Object(
+			transaction.CallArg{
+				Object: &transaction.ObjectArg{
+					SharedObject: oracleSharedObject,
+				},
+			},
+		),
+		// 第五个参数：&PriceInfoObject 对象
+		tx.Object(
+			transaction.CallArg{
+				Object: &transaction.ObjectArg{
+					SharedObject: suppplyCollateralFeedSharedObject,
+				},
+			},
+		),
+		// 第六个参数：&PriceInfoObject 对象
+		tx.Object(
+			transaction.CallArg{
+				Object: &transaction.ObjectArg{
+					SharedObject: loanFeedSharedObject,
+				},
+			},
+		),
+		// 第七个参数：&Clock 对象
+		tx.Object(
+			transaction.CallArg{
+				Object: &transaction.ObjectArg{
+					SharedObject: clockSharedObject,
+				},
+			},
+		),
+	}
+	return arguments, err
 }
 
 func UpdateMarketRate() {

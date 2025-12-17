@@ -353,8 +353,8 @@ func RpcRequestScanVaultEvent(jobInfo ScheduledTaskRecord, isFinalTask bool) {
 				InsertVaultSetAllocatorRecord(event.ParsedJson, digest, transactionTimeUnix)
 			case SubmitTimelockEvent: //提交时间锁记录
 				InsertVaultSubmitTimeLock(event.ParsedJson, digest, transactionTimeUnix)
-			case SubmitGuardianEvent: //提交Guardian生效记录
-				InsertVaultSubmitGuardian(event.ParsedJson, digest, transactionTimeUnix)
+			case SetGuardianEvent: //设置更新Guardian记录
+				InsertVaultSetGuardian(event.ParsedJson, digest, transactionTimeUnix)
 			case RevokePendingEvent: //Vault撤销待定记录
 				InsertVaultRevokePending(event.ParsedJson, digest, transactionTimeUnix)
 			case SubmitSupplyCapEvent: //vault提交生效cap
@@ -1463,12 +1463,11 @@ func InsertVaultRevokePending(parsedJson map[string]interface{}, digest string, 
 	defer con.Close()
 }
 
-func InsertVaultSubmitGuardian(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
+func InsertVaultSetGuardian(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
 	vaultId := parsedJson["vault_id"].(string)
 	caller := parsedJson["caller"].(string)
-	guardian := parsedJson["guardian"].(string)
-	valid_at_ms := parsedJson["valid_at_ms"].(string)
-	event_type := parsedJson["event_type"]
+	previous_guardian := parsedJson["previous_guardian"].(string)
+	new_guardian := parsedJson["new_guardian"].(string)
 	timestampMsUnix := parsedJson["timestamp_ms"].(string)
 	convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
 	if convErr != nil {
@@ -1481,28 +1480,37 @@ func InsertVaultSubmitGuardian(parsedJson map[string]interface{}, digest string,
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_submit_guardian where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from vault_set_guardian_record where digest=?", digest)
 	if queryErr != nil {
-		log.Printf("vault_submit_guardian查询 digest失败: %v", queryErr)
+		log.Printf("vault_set_guardian_record查询 digest失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("vault_submit_guardian digest exist :%v\n", digest)
+		fmt.Printf("vault_set_guardian_record digest exist :%v\n", digest)
 		defer queryRs.Close()
 		defer con.Close()
 		return
 	}
 
-	sql := "insert into vault_submit_guardian(vault_id,caller,guardian,valid_at_ms,event_type,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
-	result, err := con.Exec(sql, vaultId, caller, guardian, valid_at_ms, event_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
+	sql := "insert into vault_set_guardian_record(vault_id,caller,previous_guardian,new_guardian,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?)"
+	result, err := con.Exec(sql, vaultId, caller, previous_guardian, new_guardian, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
-		log.Printf("vault_submit_guardian新增失败: %v", err)
+		log.Printf("vault_set_guardian_record新增失败: %v", err)
 		defer con.Close()
 		return
 	}
 	lastInsertID, _ := result.LastInsertId()
-	log.Printf("vault_submit_guardian新增id：=%v", lastInsertID)
+	log.Printf("vault_set_guardian_record新增id：=%v", lastInsertID)
+	upVaultSql := "update vault set guardian=? where vault_id=?"
+	rsUp, errUp := con.Exec(upVaultSql, new_guardian, vaultId)
+	if errUp != nil {
+		log.Printf("vault guardian更新失败: %v", errUp)
+		defer con.Close()
+		return
+	}
+	updateRowCount, _ := rsUp.RowsAffected()
+	log.Printf("vault updateRowCount=:%d\n", updateRowCount)
 	defer con.Close()
 }
 
@@ -1588,7 +1596,15 @@ func InsertVaultSetAllocatorRecord(parsedJson map[string]interface{}, digest str
 	}
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("vault_set_allocator_record新增id：=%v", lastInsertID)
-	//todo 更新 vault主表allocator
+	upVaultSql := "update vault set allocator=? where vault_id=?"
+	rsUp, errUp := con.Exec(upVaultSql, new_allocator, vaultId)
+	if errUp != nil {
+		log.Printf("vault allocator更新失败: %v", errUp)
+		defer con.Close()
+		return
+	}
+	updateRowCount, _ := rsUp.RowsAffected()
+	log.Printf("vault updateRowCount=:%d\n", updateRowCount)
 	defer con.Close()
 }
 
@@ -1631,7 +1647,16 @@ func InsertVaultSetCuratorRecord(parsedJson map[string]interface{}, digest strin
 	}
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("vault_set_curator_record新增id：=%v", lastInsertID)
-	//todo 更新 vault主表curator
+
+	upVaultSql := "update vault set curator=? where vault_id=?"
+	rsUp, errUp := con.Exec(upVaultSql, new_curator, vaultId)
+	if errUp != nil {
+		log.Printf("vault curator更新失败: %v", errUp)
+		defer con.Close()
+		return
+	}
+	updateRowCount, _ := rsUp.RowsAffected()
+	log.Printf("vault updateRowCount=:%d\n", updateRowCount)
 	defer con.Close()
 }
 

@@ -28,6 +28,7 @@ const (
 	// HEarnObjectId     = "0x082de782f879b8a06666c14238221456c965707f356a4ca1b73e6b9ff2d19b63"
 	PackageId         = "0x4f7369507fbcb3118bf11c8c40fd0fba4d4fbfd49191ac16b9bf4a718d29d0a5" //12-17 09:10
 	HEarnObjectId     = "0xc910c86b33b5f27d027465cb84cc6ce800fef12176164acdceb2b3f236ffeb44"
+	OracleObjectId    = "0xbcf3d92d68be8162ca5f56fd2dee5cb48d262bdd4361b2318b743fe333d5603d"
 	SuiUserAddress    = "0x438796b44e606f8768c925534ebb87be9ded13cc51a6ddd955e6e40ab85db6f5"
 	SuiBlockvisionEnv = "https://sui-testnet-endpoint.blockvision.org"
 	SuiEnv            = "https://fullnode.testnet.sui.io:443"
@@ -50,7 +51,7 @@ const (
 	SetCuratorEvent              = "::meta_vault_events::SetCuratorEvent"              //Vault设置更新Curator记录
 	SetAllocatorEvent            = "::meta_vault_events::SetAllocatorEvent"            //Vault设置更新Allocator记录
 	SubmitTimelockEvent          = "::meta_vault_events::SubmitTimelockEvent"          //提交时间锁记录
-	SubmitGuardianEvent          = "::meta_vault_events::SubmitGuardianEvent"          //提交Guardian生效记录
+	SetGuardianEvent             = "::meta_vault_events::SetGuardianEvent"             //设置更新Guardian记录
 	RevokePendingEvent           = "::meta_vault_events::RevokePendingEvent"           //Vault撤销待定记录
 	SubmitSupplyCapEvent         = "::meta_vault_events::SubmitSupplyCapEvent"         //vault提交生效cap
 	ApplySupplyCapEvent          = "::meta_vault_events::ApplySupplyCapEvent"          //vault应用存入上限cap
