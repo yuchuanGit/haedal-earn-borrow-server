@@ -211,28 +211,40 @@ func (m *MarketInfo) UnmarshalBCS(d *bcs.Deserializer) error {
 	m.UtilizationRate = d.U128()
 	m.MarketPaused = d.Bool()
 	m.GlobalPaused = d.Bool()
+	m.IsSupplyPause = d.Bool()
+	m.IsWithdrawPause = d.Bool()
+	m.IsSupplyCollateralPause = d.Bool()
+	m.IsWithdrawCollateralPause = d.Bool()
+	m.IsBorrowPause = d.Bool()
+	m.IsRepayPause = d.Bool()
 	m.Title = d.ReadString()
 	return nil
 }
 
 type MarketInfo struct {
-	MarketId              uint64  `bcs:"market_id"`
-	SupplyCoinType        string  `bcs:"supply_coin_type"`
-	CollateralCoinType    string  `bcs:"collateral_coin_type"`
-	Ltv                   uint64  `bcs:"ltv"`
-	Lltv                  uint64  `bcs:"lltv"`                    // Liquidation Loan-to-Value in WAD
-	LiquidationThreshold  uint64  `bcs:"liquidation_threshold"`   // Liquidation threshold (same as LLTV)
-	TotalSupplyAssets     big.Int `bcs:"total_supply_assets"`     // Total supplied assets
-	TotalBorrowAssets     big.Int `bcs:"total_borrow_assets"`     // Total borrowed assets
-	TotalCollateralAssets big.Int `bcs:"total_collateral_assets"` // Total collateral assets
-	Fee                   big.Int `bcs:"fee"`                     // Protocol fee in WAD
-	FlashloanFee          big.Int `bcs:"flashloan_fee"`           // Flash loan fee in WAD
-	SupplyRate            big.Int `bcs:"supply_rate"`             // Current supply rate (WAD precision)
-	BorrowRate            big.Int `bcs:"borrow_rate"`             // Current borrow rate (WAD precision)
-	UtilizationRate       big.Int `bcs:"utilization_rate"`        // Market utilization rate (WAD precision, total_borrow / total_supply)
-	MarketPaused          bool    `bcs:"market_paused"`           // Market-level pause flag
-	GlobalPaused          bool    `bcs:"global_paused"`           // Global pause flag
-	Title                 string  `bcs:"title"`                   // Human readable market title
+	MarketId                  uint64  `bcs:"market_id"`
+	SupplyCoinType            string  `bcs:"supply_coin_type"`
+	CollateralCoinType        string  `bcs:"collateral_coin_type"`
+	Ltv                       uint64  `bcs:"ltv"`
+	Lltv                      uint64  `bcs:"lltv"`                    // Liquidation Loan-to-Value in WAD
+	LiquidationThreshold      uint64  `bcs:"liquidation_threshold"`   // Liquidation threshold (same as LLTV)
+	TotalSupplyAssets         big.Int `bcs:"total_supply_assets"`     // Total supplied assets
+	TotalBorrowAssets         big.Int `bcs:"total_borrow_assets"`     // Total borrowed assets
+	TotalCollateralAssets     big.Int `bcs:"total_collateral_assets"` // Total collateral assets
+	Fee                       big.Int `bcs:"fee"`                     // Protocol fee in WAD
+	FlashloanFee              big.Int `bcs:"flashloan_fee"`           // Flash loan fee in WAD
+	SupplyRate                big.Int `bcs:"supply_rate"`             // Current supply rate (WAD precision)
+	BorrowRate                big.Int `bcs:"borrow_rate"`             // Current borrow rate (WAD precision)
+	UtilizationRate           big.Int `bcs:"utilization_rate"`        // Market utilization rate (WAD precision, total_borrow / total_supply)
+	MarketPaused              bool    `bcs:"market_paused"`           // Market-level pause flag
+	GlobalPaused              bool    `bcs:"global_paused"`           // Global pause flag
+	IsSupplyPause             bool    `bcs:"is_supply_pause"`
+	IsWithdrawPause           bool    `bcs:"is_withdraw_pause"`
+	IsSupplyCollateralPause   bool    `bcs:"is_supply_collateral_pause"`
+	IsWithdrawCollateralPause bool    `bcs:"is_withdraw_collateral_pause"`
+	IsBorrowPause             bool    `bcs:"is_borrow_pause"`
+	IsRepayPause              bool    `bcs:"is_repay_pause"`
+	Title                     string  `bcs:"title"` // Human readable market title
 }
 
 // 实现 bcs.Marshaler 接口（可选，默认通过反射）
