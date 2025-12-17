@@ -592,14 +592,14 @@ func InsertVaultRebalance(parsedJson map[string]interface{}, digest string, tran
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_rebalance where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from vault_rebalance where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_rebalance查询 digest失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("vault_rebalance digest exist :%v\n", digest)
+		fmt.Printf("vault_rebalance digest+vaultId exist :%v,%v\n", digest, vaultId)
 		defer queryRs.Close()
 		defer con.Close()
 		return
@@ -637,14 +637,14 @@ func InsertVaultAccrueFees(parsedJson map[string]interface{}, digest string, tra
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_accrue_fees where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from vault_accrue_fees where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_accrue_fees查询 digest失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("vault_accrue_fees digest exist :%v\n", digest)
+		fmt.Printf("vault_accrue_fees digest+vaultId exist :%v,%v\n", digest, vaultId)
 		defer queryRs.Close()
 		defer con.Close()
 		return
@@ -681,14 +681,14 @@ func InsertVaultCompensateLostAssets(parsedJson map[string]interface{}, digest s
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_compensate_lost_assets where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from vault_compensate_lost_assets where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_compensate_lost_assets查询 digest失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("vault_compensate_lost_assets digest exist :%v\n", digest)
+		fmt.Printf("vault_compensate_lost_assets digest+vaultId exist :%v,%v\n", digest, vaultId)
 		defer queryRs.Close()
 		defer con.Close()
 		return
@@ -770,14 +770,14 @@ func InsertVaultWithdraw(parsedJson map[string]interface{}, digest string, trans
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_withdraw where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from vault_withdraw where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_withdraw查询 digest失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("vault_withdraw digest exist :%v\n", digest)
+		fmt.Printf("vault_withdraw digest+vaultId exist :%v,%v\n", digest, vaultId)
 		defer queryRs.Close()
 		defer con.Close()
 		return
@@ -814,14 +814,14 @@ func InsertVaultDeposit(parsedJson map[string]interface{}, digest string, transa
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_deposit where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from vault_deposit where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_deposit查询 digest失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("vault_deposit digest exist :%v\n", digest)
+		fmt.Printf("vault_deposit digest+vaultId exist :%v,%v\n", digest, vaultId)
 		defer queryRs.Close()
 		defer con.Close()
 		return
@@ -1657,14 +1657,14 @@ func InsertWithdrawSupplyQueue(parsedJson map[string]interface{}, digest string,
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_withdraw_queue where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from vault_withdraw_queue where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_withdraw_queue查询 digest失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("vvault_withdraw_queue digest exist :%v\n", digest)
+		fmt.Printf("vvault_withdraw_queue digest+vaultId exist :%v,%v\n", digest, vaultId)
 		defer queryRs.Close()
 		defer con.Close()
 		return
@@ -1703,14 +1703,14 @@ func InsertVaultSupplyQueue(parsedJson map[string]interface{}, digest string, tr
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_supply_queue where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from vault_supply_queue where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_supply_queue查询 digest失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("vault_supply_queue digest exist :%v\n", digest)
+		fmt.Printf("vault_supply_queue digest+vaultId exist :%v,%v\n", digest, vaultId)
 		defer queryRs.Close()
 		defer con.Close()
 		return

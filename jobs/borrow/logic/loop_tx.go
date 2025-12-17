@@ -125,7 +125,7 @@ func RpcApiRequest(nextCursor string) {
 			switch eventType {
 			case CreateMarketEvent:
 				InsertBorrow(event.ParsedJson, digest, transactionTime)
-			case SupplyEvent: //存操作
+			case SupplyEvent: //存资产操作
 				InsertBorrowSupplyDetali(event.ParsedJson, digest, transactionTime)
 			case SupplyCollateralEvent: //抵押存入
 				InsertBorrowSupplyDetaliCollateral(event.ParsedJson, digest, transactionTime)
@@ -158,14 +158,14 @@ func InsertBorrowRateUpdate(parsedJson map[string]interface{}, digest string, tr
 	}
 	transactionTime := time.UnixMilli(convRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from borrow_rate_update where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from borrow_rate_update where digest=? and market_id=?", digest, market_id)
 	if queryErr != nil {
 		log.Printf("borrow_rate_update查询 digest失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("BorrowRateUpdateEvent digest exist :%v\n", digest)
+		fmt.Printf("BorrowRateUpdateEvent digest+market_id exist :%v,%v\n", digest, market_id)
 		defer queryRs.Close() // 务必关闭结果集
 		defer con.Close()
 		return
@@ -233,14 +233,14 @@ func InsertRateDetali(parsedJson map[string]interface{}, transactions []interfac
 		}
 		transactionTime := time.UnixMilli(convRs)
 		con := common.GetDbConnection()
-		queryRs, queryErr := con.Query("select * from rate_detail where digest=?", digest)
+		queryRs, queryErr := con.Query("select * from rate_detail where digest=? and market_id=?", digest, market_id)
 		if queryErr != nil {
 			log.Printf("borrow查询 digest失败: %v", queryErr)
 			defer con.Close()
 			return
 		}
 		if queryRs.Next() {
-			fmt.Printf("AccrueInterestEvent digest exist :%v\n", digest)
+			fmt.Printf("AccrueInterestEvent digest+market_id exist :%v,%v\n", digest, market_id)
 			defer queryRs.Close()
 			defer con.Close()
 			return
@@ -273,14 +273,14 @@ func InsertBorroWithdraw(parsedJson map[string]interface{}, digest string, trans
 	}
 	transactionTime := time.UnixMilli(convRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from borrow_withdraw where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from borrow_withdraw where digest=? and market_id=?", digest, market_id)
 	if queryErr != nil {
 		log.Printf("borrow_withdraw查询 digest失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("WithdrawEvent digest exist :%v\n", digest)
+		fmt.Printf("WithdrawEvent digest+market_id exist :%v,%v\n", digest, market_id)
 		defer queryRs.Close() // 务必关闭结果集
 		defer con.Close()
 		return
@@ -497,14 +497,14 @@ func InsertBorrowSupplyDetali(parsedJson map[string]interface{}, digest string, 
 	transactionTime := time.UnixMilli(convRs)
 	con := common.GetDbConnection()
 	// tx, txErr := con.Begin()
-	queryRs, queryErr := con.Query("select * from borrow_supply_detail where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from borrow_supply_detail where digest=? and market_id=?", digest, market_id)
 	if queryErr != nil {
-		log.Printf("borrow查询 digest失败: %v", queryErr)
+		log.Printf("borrow查询 digest+market_id失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("SupplyEvent digest exist :%v\n", digest)
+		fmt.Printf("SupplyEvent digest+market_id exist :%v,%v\n", digest, market_id)
 		defer queryRs.Close() // 务必关闭结果集
 		defer con.Close()
 		return
