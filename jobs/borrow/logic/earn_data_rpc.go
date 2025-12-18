@@ -111,8 +111,8 @@ func InsertVaultExchangeRate(vaultId string, asset_decimals float64, exchangeRat
 func InsertVaultApy(vaultId string, exchangeRate string) {
 	var preApy VaultApyModel
 	con := common.GetDbConnection()
-	querySql := "SELECT id,vault_id,exchange_rate,apy,transaction_time from vault_apy where  transaction_time=(SELECT max(transaction_time) previousTime from vault_apy where vault_id=?)"
-	queryErr := con.QueryRow(querySql, vaultId).Scan(&preApy.Id, &preApy.VaultId, &preApy.ExchangeRate, &preApy.Apy, &preApy.TransactionTime)
+	querySql := "SELECT id,vault_id,exchange_rate,apy,transaction_time from vault_apy where  vault_id=? and transaction_time=(SELECT max(transaction_time) previousTime from vault_apy where vault_id=?)"
+	queryErr := con.QueryRow(querySql, vaultId, vaultId).Scan(&preApy.Id, &preApy.VaultId, &preApy.ExchangeRate, &preApy.Apy, &preApy.TransactionTime)
 	exchangeRateF, _ := strconv.ParseFloat(exchangeRate, 64)
 	currentNow := time.Now()
 	yearApy := 0.00
