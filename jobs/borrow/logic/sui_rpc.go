@@ -25,7 +25,7 @@ func InsertClearingUser() {
 	var loanUsers []LoanUserInfo
 	con := common.GetDbConnection()
 	sql := "SELECT loanUser.market_id,loanUser.caller_address, " +
-		"ccc.feed_object_id as collateralFeedObjectId,ccl.feed_object_id as loanFeedObjectId " +
+		"ccc.feed_id as collateralFeedId,ccc.feed_object_id as collateralFeedObjectId,ccl.feed_id as loanFeedId,ccl.feed_object_id as loanFeedObjectId " +
 		"from (SELECT market_id,caller_address,max(collateral_token_type) collateral_token_type, max(loan_token_type) loan_token_type from borrow_detail GROUP BY caller_address,market_id) loanUser " +
 		"left join coin_config ccc on ccc.coin_type=loanUser.collateral_token_type " +
 		"left join coin_config ccl on ccl.coin_type=loanUser.loan_token_type "
@@ -35,11 +35,15 @@ func InsertClearingUser() {
 		defer con.Close()
 		return
 	}
+	feedIds := make(map[string]string)
 	for rs.Next() {
 		var userInfo LoanUserInfo
-		rs.Scan(&userInfo.MarketId, &userInfo.UserAddress, &userInfo.CollateralFeedObjectId, &userInfo.LoanFeedObjectId)
+		rs.Scan(&userInfo.MarketId, &userInfo.UserAddress, &userInfo.CollateralFeedId, &userInfo.CollateralFeedObjectId, &userInfo.LoanFeedId, &userInfo.LoanFeedObjectId)
 		loanUsers = append(loanUsers, userInfo)
+		feedIds[userInfo.CollateralFeedId] = userInfo.CollateralFeedId
+		feedIds[userInfo.LoanFeedId] = userInfo.LoanFeedId
 	}
+	log.Printf("loanUsers-length=：%v", len(loanUsers))
 	if len(loanUsers) > 0 {
 		cli := sui.NewSuiClient(SuiEnv)
 		ctx := context.Background()
@@ -47,6 +51,10 @@ func InsertClearingUser() {
 		tx.SetSuiClient(cli.(*sui.Client))
 		tx.SetSender(models.SuiAddress(SuiUserAddress))
 		var clearingUsers []UserPositionInfo
+		// cli.SuiDevInspectTransactionBlock()
+		// coinPrice := common.PythPrice(feedIds)
+		// utils.PrettyPrint(coinPrice)
+		// clien
 		for _, loanUser := range loanUsers {
 			arguments, parameErr := userPositionInfoParameter(cli, ctx, *tx, loanUser)
 			if parameErr != nil {
@@ -56,7 +64,10 @@ func InsertClearingUser() {
 			moduleName := "market"
 			funcName := "user_position_info"
 			typeArguments := []transaction.TypeTag{}
-			log.Printf("UserAddress=：%v", loanUser.UserAddress)
+			// log.Printf("UserAddress=：%v", loanUser.UserAddress)
+			// log.Printf("CollateralFeedId=：%v", loanUser.CollateralFeedId)
+			// log.Printf("LoanFeedId=：%v", loanUser.LoanFeedId)
+
 			moveCallReturn := ExecuteDevInspectTransactionBlock(cli, ctx, *tx, moduleName, funcName, typeArguments, arguments)
 			if len(moveCallReturn) > 0 {
 				for _, returnValue := range moveCallReturn[0].ReturnValues {
@@ -66,6 +77,11 @@ func InsertClearingUser() {
 					if err := userPosition.UnmarshalBCS(deserializer); err != nil {
 						panic(fmt.Sprintf("解析 UserPositionInfo 失败：%v", err))
 					} else {
+						log.Printf("UserAddress=：%v", loanUser.UserAddress)
+						log.Printf("loanUser-MarketId=：%v", loanUser.MarketId)
+						log.Printf("userPosition-MarketId=：%v", userPosition.MarketId)
+						// log.Printf("CollateralFeedId=：%v", loanUser.CollateralFeedId)
+						// log.Printf("LoanFeedId=：%v", loanUser.LoanFeedId)
 						powResult := math.Pow(10, 18)
 						HealthFactorF64, _ := strconv.ParseFloat(userPosition.HealthFactor.String(), 64)
 						healthFactorRs := powResult / HealthFactorF64
@@ -129,7 +145,9 @@ func InsertClearingUser() {
 type LoanUserInfo struct {
 	MarketId               uint64
 	UserAddress            string
+	CollateralFeedId       string
 	CollateralFeedObjectId string
+	LoanFeedId             string
 	LoanFeedObjectId       string
 }
 
