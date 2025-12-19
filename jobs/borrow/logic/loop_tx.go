@@ -29,9 +29,12 @@ const (
 	// PackageId         = "0x4f7369507fbcb3118bf11c8c40fd0fba4d4fbfd49191ac16b9bf4a718d29d0a5" //12-17 09:10
 	// HEarnObjectId     = "0xc910c86b33b5f27d027465cb84cc6ce800fef12176164acdceb2b3f236ffeb44"
 	// OracleObjectId    = "0xbcf3d92d68be8162ca5f56fd2dee5cb48d262bdd4361b2318b743fe333d5603d"
-	PackageId         = "0x3bb6c9ecec37aa47a6b7cc40ddfb014004d6495f6733243e34482838ea956a0e" //12-17 20:47
-	HEarnObjectId     = "0xa125076a0bc69578e7e9f60ba4a96b742604e02f1c3fc2f8994e9a3b37183bba"
-	OracleObjectId    = "0x78f30de7d853e3245f82eafe639c149316e989bb6a33e5b6346c577475f04bf3"
+	// PackageId         = "0x3bb6c9ecec37aa47a6b7cc40ddfb014004d6495f6733243e34482838ea956a0e" //12-17 20:47
+	// HEarnObjectId     = "0xa125076a0bc69578e7e9f60ba4a96b742604e02f1c3fc2f8994e9a3b37183bba"
+	// OracleObjectId    = "0x78f30de7d853e3245f82eafe639c149316e989bb6a33e5b6346c577475f04bf3"
+	PackageId         = "0x74640585be1b236885fe461c18f9a31aedd78cf9444d6af4e63b065940e41cdc" //12-19 11:15
+	HEarnObjectId     = "0x0a1be2504d6e5a23fea45692558baf0b2f68166448c6f70d80148979c0b10dbb"
+	OracleObjectId    = "0xc745cc48a1e67312e5cc637d9c54a85065a5b718d16a13afb3fbf025b0aed918"
 	SuiUserAddress    = "0x438796b44e606f8768c925534ebb87be9ded13cc51a6ddd955e6e40ab85db6f5"
 	SuiBlockvisionEnv = "https://sui-testnet-endpoint.blockvision.org"
 	SuiEnv            = "https://fullnode.testnet.sui.io:443"
