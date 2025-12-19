@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aptos-labs/aptos-go-sdk/bcs"
 	"github.com/block-vision/sui-go-sdk/models"
 	"github.com/block-vision/sui-go-sdk/sui"
 )
@@ -552,15 +551,15 @@ func InsertBorrow(parsedJson map[string]interface{}, digest string, transactionT
 	loanType := parsedJson["loan_token_type"].(map[string]interface{})["name"].(string)
 	marketId := parsedJson["market_id"].(string)
 	oracleId := parsedJson["oracle_id"].(string)
-	titleBcs := parsedJson["title"].([]any)
-	titleBcsByte, _ := anyToBytes(titleBcs)
-	deserializer := bcs.NewDeserializer(titleBcsByte)
-	title := deserializer.ReadString()
+	// titleBcs := parsedJson["title"].([]any)
+	// titleBcsByte, _ := anyToBytes(titleBcs)
+	// deserializer := bcs.NewDeserializer(titleBcsByte)
+	// title := deserializer.ReadString()
 	// title := ""
 	baseTokenDecimals := parsedJson["base_token_decimals"].(string)
 	quoteTokenDecimals := parsedJson["quote_token_decimals"].(string)
 
-	log.Printf("title=%v", title)
+	// log.Printf("title=%v", title)
 
 	con := common.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from borrow where digest=?", digest)
@@ -577,14 +576,14 @@ func InsertBorrow(parsedJson map[string]interface{}, digest string, transactionT
 		return
 	}
 
-	sql := "insert into borrow(digest,market_title,collateral_token_type,fee,lltv,ltv,loan_token_type,market_id,oracle_id,base_token_decimals,quote_token_decimals,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?,?)"
-	result, err := con.Exec(sql, digest, title, collateralType, fee, lltv, ltv, loanType, marketId, oracleId, baseTokenDecimals, quoteTokenDecimals, transactionTime)
+	sql := "insert into borrow(digest,collateral_token_type,fee,lltv,ltv,loan_token_type,market_id,oracle_id,base_token_decimals,quote_token_decimals,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?)"
+	result, err := con.Exec(sql, digest, collateralType, fee, lltv, ltv, loanType, marketId, oracleId, baseTokenDecimals, quoteTokenDecimals, transactionTime)
 	if err != nil {
-		log.Printf("新增失败: %v", err)
+		log.Printf("borrow 新增失败: %v", err)
 		defer con.Close()
 		return
 	}
 	lastInsertID, _ := result.LastInsertId()
-	log.Println("新增id：=", lastInsertID)
+	log.Println("borrow 新增id：=", lastInsertID)
 	defer con.Close() // 程序退出时关闭数据库连接
 }
