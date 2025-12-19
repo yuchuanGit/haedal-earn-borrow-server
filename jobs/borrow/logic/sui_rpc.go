@@ -330,8 +330,8 @@ func UpdateBorrowRate(marketId uint64, con *sql.DB) {
 		}
 		liquidityProportionStr := fmt.Sprintf("%.16f", liquidityProportion)
 		title := marketInfo.Title
-		upSql := "update borrow set total_supply_amount=?,total_supply_collateral_amount=?,total_loan_amount=?,supply_rate=?,borrow_rate=?,liquidity=?,liquidity_proportion=?,market_title=?,scheduled_execution=1 where market_id=?"
-		_, upErr := con.Exec(upSql, totalSupplyAssets, totalCollateralAssets, totalBorrowAssets, supplyRateStr, borrowRateStr, liquidity, liquidityProportionStr, title, marketId)
+		upSql := "update borrow set total_supply_amount=?,total_supply_collateral_amount=?,total_loan_amount=?,supply_rate=?,borrow_rate=?,liquidity=?,liquidity_proportion=?,market_title=?,ltv=?,lltv=?,scheduled_execution=1 where market_id=?"
+		_, upErr := con.Exec(upSql, totalSupplyAssets, totalCollateralAssets, totalBorrowAssets, supplyRateStr, borrowRateStr, liquidity, liquidityProportionStr, title, marketInfo.Ltv, marketInfo.Lltv, marketId)
 		if upErr != nil {
 			fmt.Printf("UpdateMarketRate update rate失败：%v\n", upErr.Error())
 		}

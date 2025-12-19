@@ -224,16 +224,18 @@ func GetTotalAssetsParameter(cli sui.ISuiAPI, ctx context.Context, tx transactio
 }
 
 type VaultModel struct {
-	VaultId       string
-	VaultName     *string
-	AssetType     string
-	HtokenType    string
-	AssetDecimals float64 //存入精度
-	TotalShares   string  //存入总的份额
-	AssetReserve  string  //总的闲置数量
-	SupplyCap     string  //Vault 最大存入数量
-	MaxDeposit    string  //Vault 单次最大存入数量
-	MinDeposit    string  //Vault 单次最小存入数量
+	VaultId           string
+	VaultName         *string
+	AssetType         string
+	HtokenType        string
+	AssetDecimals     float64 //存入精度
+	TotalShares       string  //存入总的份额
+	AssetReserve      string  //总的闲置数量
+	SupplyCap         string  //Vault 最大存入数量
+	MaxDeposit        string  //Vault 单次最大存入数量
+	MinDeposit        string  //Vault 单次最小存入数量
+	ManagementFeeBps  string
+	PerformanceFeeBps string
 }
 
 func QueryVaultInfoUpdate(vaultId string) {
@@ -263,11 +265,17 @@ func QueryVaultInfoUpdate(vaultId string) {
 			// vm.TotalShares = fmt.Sprintf("%.0f", total_shares)
 			vm.AssetReserve = fields["asset_reserve"].(string) //总的闲置数量
 			strategy := fields["strategy"].(map[string]interface{})
+			fees := fields["fees"].(map[string]interface{})
 			if strategy != nil {
 				strategyFields := strategy["fields"].(map[string]interface{})
 				vm.SupplyCap = strategyFields["supply_cap"].(string)   //Vault 最大存入数量
 				vm.MaxDeposit = strategyFields["max_deposit"].(string) //Vault 单次最大存入数量
 				vm.MinDeposit = strategyFields["min_deposit"].(string) //Vault 单次最小存入数量
+			}
+			if fees != nil {
+				feesFields := fees["fields"].(map[string]interface{})
+				vm.ManagementFeeBps = feesFields["management_fee_bps"].(string)   //Vault 管理费用
+				vm.PerformanceFeeBps = feesFields["performance_fee_bps"].(string) //Vault 绩效费用
 			}
 			VaultInfoUpdate(vm)
 		} else {
@@ -282,8 +290,8 @@ func QueryVaultInfoUpdate(vaultId string) {
 
 func VaultInfoUpdate(vm VaultModel) {
 	con := common.GetDbConnection()
-	sql := "update vault set vault_name=?,asset_decimals=?,total_shares=?,asset_reserve=?,supply_cap=?,max_deposit=?,min_deposit=? where vault_id=?"
-	result, err := con.Exec(sql, vm.VaultName, vm.AssetDecimals, vm.TotalShares, vm.AssetReserve, vm.SupplyCap, vm.MaxDeposit, vm.MinDeposit, vm.VaultId)
+	sql := "update vault set vault_name=?,asset_decimals=?,total_shares=?,asset_reserve=?,supply_cap=?,max_deposit=?,min_deposit=?,management_fee_bps=?,performance_fee_bps=? where vault_id=?"
+	result, err := con.Exec(sql, vm.VaultName, vm.AssetDecimals, vm.TotalShares, vm.AssetReserve, vm.SupplyCap, vm.MaxDeposit, vm.MinDeposit, vm.ManagementFeeBps, vm.PerformanceFeeBps, vm.VaultId)
 	if err != nil {
 		log.Printf("vault_borrow_cap新增失败: %v", err)
 		defer con.Close()
