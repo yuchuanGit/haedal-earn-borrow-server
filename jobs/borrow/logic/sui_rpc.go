@@ -7,7 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"haedal-earn-borrow-server/common"
+	"math"
 	"math/big"
+	"strconv"
+	"strings"
 
 	"log"
 
@@ -18,11 +21,11 @@ import (
 	"github.com/block-vision/sui-go-sdk/transaction"
 )
 
-func UpdateBorrowInfo() {
+func InsertClearingUser() {
 	var loanUsers []LoanUserInfo
 	con := common.GetDbConnection()
 	sql := "SELECT loanUser.market_id,loanUser.caller_address, " +
-		"ccc.feed_object_id as collateralFeedObjectId,ccl.feed_object_id as loanFeedObjectId, " +
+		"ccc.feed_object_id as collateralFeedObjectId,ccl.feed_object_id as loanFeedObjectId " +
 		"from (SELECT market_id,caller_address,max(collateral_token_type) collateral_token_type, max(loan_token_type) loan_token_type from borrow_detail GROUP BY caller_address,market_id) loanUser " +
 		"left join coin_config ccc on ccc.coin_type=loanUser.collateral_token_type " +
 		"left join coin_config ccl on ccl.coin_type=loanUser.loan_token_type "
@@ -43,27 +46,82 @@ func UpdateBorrowInfo() {
 		tx := transaction.NewTransaction()
 		tx.SetSuiClient(cli.(*sui.Client))
 		tx.SetSender(models.SuiAddress(SuiUserAddress))
-		userAddress := loanUsers[0]
-		arguments, parameErr := userPositionInfoParameter(cli, ctx, *tx, userAddress)
-		if parameErr != nil {
-			return
-		}
-		moduleName := "market"
-		funcName := "user_position_info"
-		typeArguments := []transaction.TypeTag{}
-		moveCallReturn := ExecuteDevInspectTransactionBlock(cli, ctx, *tx, moduleName, funcName, typeArguments, arguments)
-		if len(moveCallReturn) > 0 {
-			for _, returnValue := range moveCallReturn[0].ReturnValues {
-				bcsBytes, _ := anyToBytes(returnValue.([]any)[0])
-				deserializer := bcs.NewDeserializer(bcsBytes)
-				var userPosition UserPositionInfo
-				if err := userPosition.UnmarshalBCS(deserializer); err != nil {
-					panic(fmt.Sprintf("解析 UserPositionInfo 失败：%v", err))
+		var clearingUsers []UserPositionInfo
+		for _, loanUser := range loanUsers {
+			arguments, parameErr := userPositionInfoParameter(cli, ctx, *tx, loanUser)
+			if parameErr != nil {
+				log.Printf("userPositionInfo arguments fail:%v", parameErr.Error())
+				return
+			}
+			moduleName := "market"
+			funcName := "user_position_info"
+			typeArguments := []transaction.TypeTag{}
+			log.Printf("UserAddress=：%v", loanUser.UserAddress)
+			moveCallReturn := ExecuteDevInspectTransactionBlock(cli, ctx, *tx, moduleName, funcName, typeArguments, arguments)
+			if len(moveCallReturn) > 0 {
+				for _, returnValue := range moveCallReturn[0].ReturnValues {
+					bcsBytes, _ := anyToBytes(returnValue.([]any)[0])
+					deserializer := bcs.NewDeserializer(bcsBytes)
+					var userPosition UserPositionInfo
+					if err := userPosition.UnmarshalBCS(deserializer); err != nil {
+						panic(fmt.Sprintf("解析 UserPositionInfo 失败：%v", err))
+					} else {
+						powResult := math.Pow(10, 18)
+						HealthFactorF64, _ := strconv.ParseFloat(userPosition.HealthFactor.String(), 64)
+						healthFactorRs := powResult / HealthFactorF64
+						if healthFactorRs >= 0.95 {
+							userPosition.UserAddress = loanUser.UserAddress
+							clearingUsers = append(clearingUsers, userPosition)
+						}
+					}
 				}
-				// exchangeRate = val.String()
+			} else {
+				//todo 失败处理
 			}
 		}
-
+		if len(clearingUsers) > 0 {
+			clearSql := "TRUNCATE TABLE clearing_user"
+			_, clearErr := con.Exec(clearSql)
+			if clearErr != nil {
+				fmt.Printf("clearing_user清理数据失败：%v\n", err.Error())
+				defer con.Close()
+				return
+			}
+			insertBase := "insert into clearing_user(user_address,market_id,supply_assets,supply_shares,collateral,borrow_assets,borrow_shares,health_factor,withdrawable_assets,max_borrowable,max_withdrawable_collateral) VALUES "
+			// insertSql := insertBase
+			var insertSql strings.Builder
+			insertSql.WriteString(insertBase)
+			var args []any
+			for i := 0; i < len(clearingUsers); i++ {
+				if i == len(clearingUsers)-1 {
+					insertSql.WriteString("(?,?,?,?,?,?,?,?,?,?,?)")
+				} else {
+					insertSql.WriteString("(?,?,?,?,?,?,?,?,?,?,?),")
+				}
+				args = append(args, clearingUsers[i].UserAddress)
+				args = append(args, clearingUsers[i].MarketId)
+				args = append(args, clearingUsers[i].SupplyAssets)
+				args = append(args, clearingUsers[i].SupplyShares)
+				args = append(args, clearingUsers[i].Collateral)
+				args = append(args, clearingUsers[i].BorrowAssets)
+				args = append(args, clearingUsers[i].BorrowShares)
+				args = append(args, clearingUsers[i].HealthFactor)
+				args = append(args, clearingUsers[i].WithdrawableAssets)
+				args = append(args, clearingUsers[i].MaxBorrowable)
+				args = append(args, clearingUsers[i].MaxWithdrawableCollateral)
+			}
+			log.Printf("insertSql=：%v", insertSql.String())
+			_, insertErr := con.Exec(insertSql.String(), args)
+			if insertErr != nil {
+				log.Printf("clearing_user 新增错误：%v", insertErr.Error())
+				defer con.Close()
+				return
+			}
+		} else {
+			log.Println("clearingUsers 没有>=95%")
+		}
+	} else {
+		log.Println("无借款用户...")
 	}
 	defer con.Close()
 }
@@ -86,6 +144,7 @@ type UserPositionInfo struct {
 	WithdrawableAssets        big.Int `bcs:"withdrawable_assets"`         // Maximum withdrawable supply assets
 	MaxBorrowable             big.Int `bcs:"max_borrowable"`              // Maximum borrowable amount
 	MaxWithdrawableCollateral big.Int `bcs:"max_withdrawable_collateral"` // Maximum withdrawable collateral without breaching LLTV
+	UserAddress               string
 }
 
 func (m *UserPositionInfo) UnmarshalBCS(d *bcs.Deserializer) error {

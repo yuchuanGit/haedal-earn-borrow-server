@@ -845,41 +845,43 @@ func InsertVaultSubmitmentFee(parsedJson map[string]interface{}, digest string, 
 	fee_bps := parsedJson["fee_bps"].(string)
 	valid_at_ms := parsedJson["valid_at_ms"].(string)
 	event_type := parsedJson["event_type"]
-	timestampMsUnix := parsedJson["timestamp_ms"].(string)
-	convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
-	if convErr != nil {
-		log.Printf("转换失败：%v\n", convErr)
-	}
-	timestampMs := time.UnixMilli(convRs)
-	ttConvRs, ttConvErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
-	if ttConvErr != nil {
-		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
-	}
-	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_submit_management_fee where digest=?", digest)
-	if queryErr != nil {
-		log.Printf("vault_submit_management_fee查询 digest失败: %v", queryErr)
-		defer con.Close()
-		return
-	}
-	if queryRs.Next() {
-		fmt.Printf("vault_submit_management_fee digest exist :%v\n", digest)
-		defer queryRs.Close()
-		defer con.Close()
-		return
-	}
+	if event_type == "2" || event_type == "3" {
+		timestampMsUnix := parsedJson["timestamp_ms"].(string)
+		convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
+		if convErr != nil {
+			log.Printf("转换失败：%v\n", convErr)
+		}
+		timestampMs := time.UnixMilli(convRs)
+		ttConvRs, ttConvErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
+		if ttConvErr != nil {
+			log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
+		}
+		transactionTime := time.UnixMilli(ttConvRs)
+		con := common.GetDbConnection()
+		queryRs, queryErr := con.Query("select * from vault_submit_management_fee where digest=? and vault_id=?", digest, vaultId)
+		if queryErr != nil {
+			log.Printf("vault_submit_management_fee查询 digest+vault_id失败: %v", queryErr)
+			defer con.Close()
+			return
+		}
+		if queryRs.Next() {
+			fmt.Printf("vault_submit_management_fee digest+vault_id exist :%v,%v\n", digest, vaultId)
+			defer queryRs.Close()
+			defer con.Close()
+			return
+		}
 
-	sql := "insert into vault_submit_management_fee(vault_id,caller,fee_bps,valid_at_ms,event_type,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
-	result, err := con.Exec(sql, vaultId, caller, fee_bps, valid_at_ms, event_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
-	if err != nil {
-		log.Printf("vault_submit_management_fee新增失败: %v", err)
+		sql := "insert into vault_submit_management_fee(vault_id,caller,fee_bps,valid_at_ms,event_type,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
+		result, err := con.Exec(sql, vaultId, caller, fee_bps, valid_at_ms, event_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
+		if err != nil {
+			log.Printf("vault_submit_management_fee新增失败: %v", err)
+			defer con.Close()
+			return
+		}
+		lastInsertID, _ := result.LastInsertId()
+		log.Printf("vault_submit_management_fee新增id：=%v", lastInsertID)
 		defer con.Close()
-		return
 	}
-	lastInsertID, _ := result.LastInsertId()
-	log.Printf("vault_submit_management_fee新增id：=%v", lastInsertID)
-	defer con.Close()
 }
 
 func InsertVaultSubmitPerformanceFee(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
@@ -888,41 +890,44 @@ func InsertVaultSubmitPerformanceFee(parsedJson map[string]interface{}, digest s
 	fee_bps := parsedJson["fee_bps"].(string)
 	valid_at_ms := parsedJson["valid_at_ms"].(string)
 	event_type := parsedJson["event_type"]
-	timestampMsUnix := parsedJson["timestamp_ms"].(string)
-	convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
-	if convErr != nil {
-		log.Printf("转换失败：%v\n", convErr)
-	}
-	timestampMs := time.UnixMilli(convRs)
-	ttConvRs, ttConvErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
-	if ttConvErr != nil {
-		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
-	}
-	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_submit_performance_fee where digest=?", digest)
-	if queryErr != nil {
-		log.Printf("vault_submit_performance_fee查询 digest失败: %v", queryErr)
+	if event_type == "2" || event_type == "3" {
+		timestampMsUnix := parsedJson["timestamp_ms"].(string)
+		convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
+		if convErr != nil {
+			log.Printf("转换失败：%v\n", convErr)
+		}
+		timestampMs := time.UnixMilli(convRs)
+		ttConvRs, ttConvErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
+		if ttConvErr != nil {
+			log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
+		}
+		transactionTime := time.UnixMilli(ttConvRs)
+		con := common.GetDbConnection()
+		queryRs, queryErr := con.Query("select * from vault_submit_performance_fee where digest=? and vault_id=?", digest, vaultId)
+		if queryErr != nil {
+			log.Printf("vault_submit_performance_fee查询 digest+vault_id失败: %v", queryErr)
+			defer con.Close()
+			return
+		}
+		if queryRs.Next() {
+			fmt.Printf("vault_submit_performance_fee digest+vault_id exist :%v,%v\n", digest, vaultId)
+			defer queryRs.Close()
+			defer con.Close()
+			return
+		}
+
+		sql := "insert into vault_submit_performance_fee(vault_id,caller,fee_bps,valid_at_ms,event_type,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
+		result, err := con.Exec(sql, vaultId, caller, fee_bps, valid_at_ms, event_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
+		if err != nil {
+			log.Printf("vault_submit_performance_fee新增失败: %v", err)
+			defer con.Close()
+			return
+		}
+		lastInsertID, _ := result.LastInsertId()
+		log.Printf("vault_submit_performance_fee新增id：=%v", lastInsertID)
 		defer con.Close()
-		return
-	}
-	if queryRs.Next() {
-		fmt.Printf("vault_submit_performance_fee digest exist :%v\n", digest)
-		defer queryRs.Close()
-		defer con.Close()
-		return
 	}
 
-	sql := "insert into vault_submit_performance_fee(vault_id,caller,fee_bps,valid_at_ms,event_type,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
-	result, err := con.Exec(sql, vaultId, caller, fee_bps, valid_at_ms, event_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
-	if err != nil {
-		log.Printf("vault_submit_performance_fee新增失败: %v", err)
-		defer con.Close()
-		return
-	}
-	lastInsertID, _ := result.LastInsertId()
-	log.Printf("vault_submit_performance_fee新增id：=%v", lastInsertID)
-	defer con.Close()
 }
 
 func InsertVaultApplyManagementFee(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
@@ -1260,41 +1265,44 @@ func InsertVaultSubmitSupplyCap(parsedJson map[string]interface{}, digest string
 	new_cap := parsedJson["new_cap"].(string)
 	valid_at_ms := parsedJson["valid_at_ms"].(string)
 	event_type := parsedJson["event_type"]
-	timestampMsUnix := parsedJson["timestamp_ms"].(string)
-	convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
-	if convErr != nil {
-		log.Printf("转换失败：%v\n", convErr)
-	}
-	timestampMs := time.UnixMilli(convRs)
-	ttConvRs, ttConvErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
-	if ttConvErr != nil {
-		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
-	}
-	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_submit_supply_cap where digest=?", digest)
-	if queryErr != nil {
-		log.Printf("vault_submit_supply_cap查询 digest失败: %v", queryErr)
+	if event_type == "2" || event_type == "3" {
+		timestampMsUnix := parsedJson["timestamp_ms"].(string)
+		convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
+		if convErr != nil {
+			log.Printf("转换失败：%v\n", convErr)
+		}
+		timestampMs := time.UnixMilli(convRs)
+		ttConvRs, ttConvErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
+		if ttConvErr != nil {
+			log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
+		}
+		transactionTime := time.UnixMilli(ttConvRs)
+		con := common.GetDbConnection()
+		queryRs, queryErr := con.Query("select * from vault_submit_supply_cap where digest=? and vault_id=?", digest, vaultId)
+		if queryErr != nil {
+			log.Printf("vault_submit_supply_cap查询 digest+vault_id失败: %v", queryErr)
+			defer con.Close()
+			return
+		}
+		if queryRs.Next() {
+			fmt.Printf("vault_submit_supply_cap digest+vault_id exist :%v,%v\n", digest, vaultId)
+			defer queryRs.Close()
+			defer con.Close()
+			return
+		}
+
+		sql := "insert into vault_submit_supply_cap(vault_id,caller,new_cap,valid_at_ms,event_type,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
+		result, err := con.Exec(sql, vaultId, caller, new_cap, valid_at_ms, event_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
+		if err != nil {
+			log.Printf("vault_submit_supply_cap新增失败: %v", err)
+			defer con.Close()
+			return
+		}
+		lastInsertID, _ := result.LastInsertId()
+		log.Printf("vault_submit_supply_cap新增id：=%v", lastInsertID)
 		defer con.Close()
-		return
-	}
-	if queryRs.Next() {
-		fmt.Printf("vault_submit_supply_cap digest exist :%v\n", digest)
-		defer queryRs.Close()
-		defer con.Close()
-		return
 	}
 
-	sql := "insert into vault_submit_supply_cap(vault_id,caller,new_cap,valid_at_ms,event_type,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
-	result, err := con.Exec(sql, vaultId, caller, new_cap, valid_at_ms, event_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
-	if err != nil {
-		log.Printf("vault_submit_supply_cap新增失败: %v", err)
-		defer con.Close()
-		return
-	}
-	lastInsertID, _ := result.LastInsertId()
-	log.Printf("vault_submit_supply_cap新增id：=%v", lastInsertID)
-	defer con.Close()
 }
 
 func InsertVaultApplySupplyCap(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
