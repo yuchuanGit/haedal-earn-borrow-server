@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"haedal-earn-borrow-server/common"
 	"log"
@@ -112,7 +113,7 @@ func RpcApiRequest(nextCursor string) {
 	ctx := context.Background()
 	resp, err := cli.SuiXQueryTransactionBlocks(ctx, SuiTransactionBlockParameter(nextCursor))
 	if err != nil {
-		fmt.Printf("RpcApiRequest err:%v\n", err)
+		fmt.Printf("borrow RpcApiRequest err:%v\n", err)
 		return
 	}
 	EventsCursorUpdate(resp.NextCursor)
@@ -201,17 +202,21 @@ func EventsCursorUpdate(digest string) {
 }
 
 func QueryEventsCursor() string {
-	digest := ""
+	// digest := ""
+	var digest sql.NullString
 	con := common.GetDbConnection()
 	sql := "select digest from scheduled_task_record where timing_type=1"
 	err := con.QueryRow(sql).Scan(&digest)
 	if err != nil {
 		log.Printf("QueryEventsCursor失败：%v\n", err)
 		defer con.Close()
-		return digest
+		return ""
 	}
 	defer con.Close()
-	return digest
+	if digest.Valid {
+		return digest.String
+	}
+	return ""
 }
 
 func GetTransactionFunctionName(transactions []interface{}) string {

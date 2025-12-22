@@ -852,8 +852,12 @@ func InsertVaultSubmitmentFee(parsedJson map[string]interface{}, digest string, 
 	caller := parsedJson["caller"].(string)
 	fee_bps := parsedJson["fee_bps"].(string)
 	valid_at_ms := parsedJson["valid_at_ms"].(string)
-	event_type := parsedJson["event_type"]
-	if event_type == "2" || event_type == "3" {
+	floatVal, ok := parsedJson["event_type"].(float64)
+	if !ok || floatVal < 0 || floatVal > 255 {
+		log.Printf("event_type 解析失败：值=%v, 类型=%T", parsedJson["event_type"], parsedJson["event_type"])
+	}
+	event_type := uint8(floatVal)
+	if event_type == 2 || event_type == 3 {
 		timestampMsUnix := parsedJson["timestamp_ms"].(string)
 		convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
 		if convErr != nil {
@@ -897,8 +901,12 @@ func InsertVaultSubmitPerformanceFee(parsedJson map[string]interface{}, digest s
 	caller := parsedJson["caller"].(string)
 	fee_bps := parsedJson["fee_bps"].(string)
 	valid_at_ms := parsedJson["valid_at_ms"].(string)
-	event_type := parsedJson["event_type"]
-	if event_type == "2" || event_type == "3" {
+	floatVal, ok := parsedJson["event_type"].(float64)
+	if !ok || floatVal < 0 || floatVal > 255 {
+		log.Printf("event_type 解析失败：值=%v, 类型=%T", parsedJson["event_type"], parsedJson["event_type"])
+	}
+	event_type := uint8(floatVal)
+	if event_type == 2 || event_type == 3 {
 		timestampMsUnix := parsedJson["timestamp_ms"].(string)
 		convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
 		if convErr != nil {
@@ -1272,8 +1280,12 @@ func InsertVaultSubmitSupplyCap(parsedJson map[string]interface{}, digest string
 	caller := parsedJson["caller"].(string)
 	new_cap := parsedJson["new_cap"].(string)
 	valid_at_ms := parsedJson["valid_at_ms"].(string)
-	event_type := parsedJson["event_type"]
-	if event_type == "2" || event_type == "3" {
+	floatVal, ok := parsedJson["event_type"].(float64)
+	if !ok || floatVal < 0 || floatVal > 255 {
+		log.Printf("event_type 解析失败：值=%v, 类型=%T", parsedJson["event_type"], parsedJson["event_type"])
+	}
+	event_type := uint8(floatVal)
+	if event_type == 2 || event_type == 3 {
 		timestampMsUnix := parsedJson["timestamp_ms"].(string)
 		convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
 		if convErr != nil {

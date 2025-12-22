@@ -38,7 +38,11 @@ func InsertClearingUser() {
 	feedIds := make(map[string]string)
 	for rs.Next() {
 		var userInfo LoanUserInfo
-		rs.Scan(&userInfo.MarketId, &userInfo.UserAddress, &userInfo.CollateralFeedId, &userInfo.CollateralFeedObjectId, &userInfo.LoanFeedId, &userInfo.LoanFeedObjectId)
+		errScan := rs.Scan(&userInfo.MarketId, &userInfo.UserAddress, &userInfo.CollateralFeedId, &userInfo.CollateralFeedObjectId, &userInfo.LoanFeedId, &userInfo.LoanFeedObjectId)
+		if errScan != nil {
+			log.Printf("扫描LoanUserInfo信息失败：%v", errScan)
+			continue
+		}
 		loanUsers = append(loanUsers, userInfo)
 		feedIds[userInfo.CollateralFeedId] = userInfo.CollateralFeedId
 		feedIds[userInfo.LoanFeedId] = userInfo.LoanFeedId
