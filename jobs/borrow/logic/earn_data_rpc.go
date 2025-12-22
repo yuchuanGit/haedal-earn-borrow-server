@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"haedal-earn-borrow-server/common"
 	"log"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -95,9 +94,9 @@ func InsertVaultExchangeRate(vaultId string, asset_decimals float64, exchangeRat
 	con := common.GetDbConnection()
 	sql := "insert into vault_exchange_rate(vault_id,exchange_rate,transaction_time) value(?,?,?)"
 	exchangeRateF, _ := strconv.ParseFloat(exchangeRate, 64)
-	powResult := math.Pow(10, asset_decimals+6)
-	val := powResult / exchangeRateF
-	result, err := con.Exec(sql, vaultId, fmt.Sprintf("%.0f", val), time.Now())
+	// powResult := math.Pow(10, asset_decimals+6)
+	// val := powResult / exchangeRateF
+	result, err := con.Exec(sql, vaultId, fmt.Sprintf("%.0f", exchangeRateF), time.Now())
 	if err != nil {
 		log.Printf("vault_exchange_rate新增失败: %v", err)
 		defer con.Close()
@@ -118,8 +117,8 @@ func InsertVaultApy(vaultId string, exchangeRate string) {
 	yearApy := 0.00
 	if QueryRowIsValue(queryErr) {
 		preExchangeRateF, _ := strconv.ParseFloat(preApy.ExchangeRate, 64)
-		differenceInSeconds := currentNow.Unix() - preApy.TransactionTime.Unix()                            //上一次采集和当前采集相差秒
-		perSecondApy := ((preExchangeRateF - exchangeRateF) / exchangeRateF) / float64(differenceInSeconds) //每秒apy
+		differenceInSeconds := currentNow.Unix() - preApy.TransactionTime.Unix()                               //上一次采集和当前采集相差秒
+		perSecondApy := ((exchangeRateF - preExchangeRateF) / preExchangeRateF) / float64(differenceInSeconds) //每秒apy
 		yearApy = perSecondApy * 60 * 60 * 24 * 365
 	}
 	sql := "insert into vault_apy(vault_id,exchange_rate,apy,transaction_time) value(?,?,?,?)"
