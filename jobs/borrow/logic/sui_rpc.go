@@ -165,8 +165,7 @@ type UserPositionInfo struct {
 	UserAddress               string
 }
 
-func (m *UserPositionInfo) UnmarshalBCS(d *bcs.Deserializer) error {
-	var u UserPositionInfo
+func (u *UserPositionInfo) UnmarshalBCS(d *bcs.Deserializer) error {
 	u.MarketId = d.U64()
 	u.Collateral = d.U128()
 	u.BorrowShares = d.U128()
