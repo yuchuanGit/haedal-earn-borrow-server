@@ -21,7 +21,7 @@ func startJob() {
 	_, err := c.AddFunc("*/20 * * * * *", func() {
 		fmt.Println("cron 任务执行：", time.Now().Format("15:04:05.000"))
 		logic.UpdateMarketRate()
-		// logic.GetMarketInfo()
+		// logic.InsertClearingUser()
 	})
 	if err != nil {
 		fmt.Println("borrow添加任务失败：", err)

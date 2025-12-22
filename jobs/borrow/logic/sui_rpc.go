@@ -35,7 +35,7 @@ func InsertClearingUser() {
 		defer con.Close()
 		return
 	}
-	feedIds := make(map[string]string)
+	// feedIds := make(map[string]string)
 	for rs.Next() {
 		var userInfo LoanUserInfo
 		errScan := rs.Scan(&userInfo.MarketId, &userInfo.UserAddress, &userInfo.CollateralFeedId, &userInfo.CollateralFeedObjectId, &userInfo.LoanFeedId, &userInfo.LoanFeedObjectId)
@@ -44,10 +44,9 @@ func InsertClearingUser() {
 			continue
 		}
 		loanUsers = append(loanUsers, userInfo)
-		feedIds[userInfo.CollateralFeedId] = userInfo.CollateralFeedId
-		feedIds[userInfo.LoanFeedId] = userInfo.LoanFeedId
+		// feedIds[userInfo.CollateralFeedId] = userInfo.CollateralFeedId
+		// feedIds[userInfo.LoanFeedId] = userInfo.LoanFeedId
 	}
-	log.Printf("loanUsers-length=：%v", len(loanUsers))
 	if len(loanUsers) > 0 {
 		cli := sui.NewSuiClient(SuiEnv)
 		ctx := context.Background()
@@ -55,10 +54,8 @@ func InsertClearingUser() {
 		tx.SetSuiClient(cli.(*sui.Client))
 		tx.SetSender(models.SuiAddress(SuiUserAddress))
 		var clearingUsers []UserPositionInfo
-		// cli.SuiDevInspectTransactionBlock()
+
 		// coinPrice := common.PythPrice(feedIds)
-		// utils.PrettyPrint(coinPrice)
-		// clien
 		for _, loanUser := range loanUsers {
 			arguments, parameErr := userPositionInfoParameter(cli, ctx, *tx, loanUser)
 			if parameErr != nil {
@@ -68,10 +65,6 @@ func InsertClearingUser() {
 			moduleName := "market"
 			funcName := "user_position_info"
 			typeArguments := []transaction.TypeTag{}
-			// log.Printf("UserAddress=：%v", loanUser.UserAddress)
-			// log.Printf("CollateralFeedId=：%v", loanUser.CollateralFeedId)
-			// log.Printf("LoanFeedId=：%v", loanUser.LoanFeedId)
-
 			moveCallReturn := ExecuteDevInspectTransactionBlock(cli, ctx, *tx, moduleName, funcName, typeArguments, arguments)
 			if len(moveCallReturn) > 0 {
 				for _, returnValue := range moveCallReturn[0].ReturnValues {
@@ -81,11 +74,6 @@ func InsertClearingUser() {
 					if err := userPosition.UnmarshalBCS(deserializer); err != nil {
 						panic(fmt.Sprintf("解析 UserPositionInfo 失败：%v", err))
 					} else {
-						log.Printf("UserAddress=：%v", loanUser.UserAddress)
-						log.Printf("loanUser-MarketId=：%v", loanUser.MarketId)
-						log.Printf("userPosition-MarketId=：%v", userPosition.MarketId)
-						// log.Printf("CollateralFeedId=：%v", loanUser.CollateralFeedId)
-						// log.Printf("LoanFeedId=：%v", loanUser.LoanFeedId)
 						powResult := math.Pow(10, 18)
 						HealthFactorF64, _ := strconv.ParseFloat(userPosition.HealthFactor.String(), 64)
 						healthFactorRs := powResult / HealthFactorF64
@@ -108,35 +96,36 @@ func InsertClearingUser() {
 				return
 			}
 			insertBase := "insert into clearing_user(user_address,market_id,supply_assets,supply_shares,collateral,borrow_assets,borrow_shares,health_factor,withdrawable_assets,max_borrowable,max_withdrawable_collateral) VALUES "
-			// insertSql := insertBase
 			var insertSql strings.Builder
 			insertSql.WriteString(insertBase)
 			var args []any
 			for i := 0; i < len(clearingUsers); i++ {
-				if i == len(clearingUsers)-1 {
-					insertSql.WriteString("(?,?,?,?,?,?,?,?,?,?,?)")
-				} else {
-					insertSql.WriteString("(?,?,?,?,?,?,?,?,?,?,?),")
+				insertSql.WriteString("(?,?,?,?,?,?,?,?,?,?,?)")
+				if i != len(clearingUsers)-1 { // 非最后一行加逗号
+					insertSql.WriteString(",")
 				}
 				args = append(args, clearingUsers[i].UserAddress)
 				args = append(args, clearingUsers[i].MarketId)
-				args = append(args, clearingUsers[i].SupplyAssets)
-				args = append(args, clearingUsers[i].SupplyShares)
-				args = append(args, clearingUsers[i].Collateral)
-				args = append(args, clearingUsers[i].BorrowAssets)
-				args = append(args, clearingUsers[i].BorrowShares)
-				args = append(args, clearingUsers[i].HealthFactor)
-				args = append(args, clearingUsers[i].WithdrawableAssets)
-				args = append(args, clearingUsers[i].MaxBorrowable)
-				args = append(args, clearingUsers[i].MaxWithdrawableCollateral)
+				args = append(args, clearingUsers[i].SupplyAssets.String())
+				args = append(args, clearingUsers[i].SupplyShares.String())
+				args = append(args, clearingUsers[i].Collateral.String())
+				args = append(args, clearingUsers[i].BorrowAssets.String())
+				args = append(args, clearingUsers[i].BorrowShares.String())
+				args = append(args, clearingUsers[i].HealthFactor.String())
+				args = append(args, clearingUsers[i].WithdrawableAssets.String())
+				args = append(args, clearingUsers[i].MaxBorrowable.String())
+				args = append(args, clearingUsers[i].MaxWithdrawableCollateral.String())
 			}
-			log.Printf("insertSql=：%v", insertSql.String())
-			_, insertErr := con.Exec(insertSql.String(), args)
+			// log.Printf("insertSql=：%v", insertSql.String())
+			// utils.PrettyPrint(args)
+			insertRs, insertErr := con.Exec(insertSql.String(), args...)
 			if insertErr != nil {
 				log.Printf("clearing_user 新增错误：%v", insertErr.Error())
 				defer con.Close()
 				return
 			}
+			updateRowCount, _ := insertRs.RowsAffected()
+			log.Println("clearing_user 新增updateRowCount：=", updateRowCount)
 		} else {
 			log.Println("clearingUsers 没有>=95%")
 		}
