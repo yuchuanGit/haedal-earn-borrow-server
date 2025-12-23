@@ -18,7 +18,7 @@ func EarnTimedCollection() {
 	vaultInfos := logic.QueryVaultAll()
 	if len(vaultInfos) > 0 {
 		transaction_time := time.Now()
-		transaction_time = transaction_time.Add(-50 * time.Second) //当前时间50秒前
+		transaction_time = transaction_time.Add(-30 * time.Second) //当前时间30秒前
 		for _, vaultInfo := range vaultInfos {
 			log.Printf("VaultId=%v\n", vaultInfo.VaultId)
 			EarnTvlTimedCollection(vaultInfo, transaction_time, 2)
