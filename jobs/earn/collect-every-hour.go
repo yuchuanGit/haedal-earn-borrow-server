@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
-	"haedal-earn-borrow-server/jobs/borrow/logic"
 	"time"
+
+	"haedal-earn-borrow-server/jobs/borrow/logic"
+	statistics "haedal-earn-borrow-server/jobs/statistics/logic"
 
 	"github.com/robfig/cron/v3"
 )
@@ -18,6 +20,8 @@ func startJob() {
 	_, err := c.AddFunc("0 0 */1 * * *", func() {
 		fmt.Println("collect-every-hour cron 任务执行：", time.Now().Format("15:04:05.000"))
 		logic.VaultAllLoopExecuteMove()
+		statistics.EarnTimedCollection()
+		statistics.MarketTimeCollection()
 	})
 	if err != nil {
 		fmt.Println("event添加任务失败：", err)
