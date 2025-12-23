@@ -6,13 +6,13 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"haedal-earn-borrow-server/common"
+	"log"
 	"math"
 	"math/big"
 	"strconv"
 	"strings"
 
-	"log"
+	"haedal-earn-borrow-server/common"
 
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
 	"github.com/block-vision/sui-go-sdk/models"
@@ -68,7 +68,7 @@ func InsertClearingUser() {
 			moveCallReturn := ExecuteDevInspectTransactionBlock(cli, ctx, *tx, moduleName, funcName, typeArguments, arguments)
 			if len(moveCallReturn) > 0 {
 				for _, returnValue := range moveCallReturn[0].ReturnValues {
-					bcsBytes, _ := anyToBytes(returnValue.([]any)[0])
+					bcsBytes, _ := AnyToBytes(returnValue.([]any)[0])
 					deserializer := bcs.NewDeserializer(bcsBytes)
 					var userPosition UserPositionInfo
 					if err := userPosition.UnmarshalBCS(deserializer); err != nil {
@@ -84,7 +84,7 @@ func InsertClearingUser() {
 					}
 				}
 			} else {
-				//todo 失败处理
+				// todo 失败处理
 			}
 		}
 		if len(clearingUsers) > 0 {
@@ -173,7 +173,8 @@ func (u *UserPositionInfo) UnmarshalBCS(d *bcs.Deserializer) error {
 }
 
 func userPositionInfoParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction,
-	userInfo LoanUserInfo) ([]transaction.Argument, error) {
+	userInfo LoanUserInfo,
+) ([]transaction.Argument, error) {
 	hearnSharedObject, err := GetSharedObjectRef(ctx, cli, HEarnObjectId, true)
 	oracleSharedObject, err4 := GetSharedObjectRef(ctx, cli, OracleObjectId, true)
 	suppplyCollateralFeedSharedObject, err5 := GetSharedObjectRef(ctx, cli, userInfo.CollateralFeedObjectId, true)
@@ -300,11 +301,11 @@ func UpdateBorrowRate(marketId uint64, con *sql.DB) {
 	var maxUtilization float64 = 1
 	if len(marketInfos) > 0 {
 		marketInfo := marketInfos[0]
-		supplyRate, _ := bigIntToFloat64(marketInfo.SupplyRate)                       //存利率
-		borrowRate, _ := bigIntToFloat64(marketInfo.BorrowRate)                       //借利率
-		totalSupplyAssets, _ := bigIntToFloat64(marketInfo.TotalSupplyAssets)         //总存入数量
-		totalCollateralAssets, _ := bigIntToFloat64(marketInfo.TotalCollateralAssets) //总抵押
-		totalBorrowAssets, _ := bigIntToFloat64(marketInfo.TotalBorrowAssets)         //总借出数量
+		supplyRate, _ := bigIntToFloat64(marketInfo.SupplyRate)                       // 存利率
+		borrowRate, _ := bigIntToFloat64(marketInfo.BorrowRate)                       // 借利率
+		totalSupplyAssets, _ := bigIntToFloat64(marketInfo.TotalSupplyAssets)         // 总存入数量
+		totalCollateralAssets, _ := bigIntToFloat64(marketInfo.TotalCollateralAssets) // 总抵押
+		totalBorrowAssets, _ := bigIntToFloat64(marketInfo.TotalBorrowAssets)         // 总借出数量
 		liquidityProportion := 0.00
 		if totalBorrowAssets > 0 {
 			liquidityProportion = (totalBorrowAssets / (totalSupplyAssets * maxUtilization)) * 100
@@ -394,7 +395,7 @@ func DevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx transac
 	var resultData []MarketInfo
 	for _, returnValue := range moveCallReturn[0].ReturnValues {
 		var market MarketInfo
-		bcsBytes, _ := anyToBytes(returnValue.([]any)[0])
+		bcsBytes, _ := AnyToBytes(returnValue.([]any)[0])
 		deserializer := bcs.NewDeserializer(bcsBytes)
 		if err := market.UnmarshalBCS(deserializer); err != nil {
 			panic(fmt.Sprintf("解析 MarketInfo 失败：%v", err))
@@ -526,7 +527,7 @@ func bcsTypeDistinctionResult(dataType interface{}, bcsBytes []byte) string {
 	return ""
 }
 
-func anyToBytes(anyData any) ([]byte, error) {
+func AnyToBytes(anyData any) ([]byte, error) {
 	switch val := anyData.(type) {
 	case []any:
 		// 处理 []any（JSON 数组）

@@ -106,7 +106,7 @@ func ExecuteMoveUpdateVaultTotalAsset(vaultId string) {
 	if len(moveCallReturn) > 0 {
 		totalAsset := "-1"
 		for _, returnValue := range moveCallReturn[0].ReturnValues {
-			bcsBytes, _ := anyToBytes(returnValue.([]any)[0])
+			bcsBytes, _ := AnyToBytes(returnValue.([]any)[0])
 			deserializer := bcs.NewDeserializer(bcsBytes)
 			val := deserializer.U128()
 			totalAsset = val.String()
@@ -136,7 +136,7 @@ func UpdateVaultTotalAsset(totalAsset string, vaultId string) {
 	sql := "update vault set total_asset=? where vault_id=?"
 	result, err := con.Exec(sql, totalAsset, vaultId)
 	if err != nil {
-		log.Printf("vault_borrow_cap新增失败: %v", err)
+		log.Printf("vault total_asset更新失败: %v", err)
 		defer con.Close()
 		return
 	}
@@ -860,7 +860,7 @@ func InsertVaultSubmitmentFee(parsedJson map[string]interface{}, digest string, 
 		log.Printf("event_type 解析失败：值=%v, 类型=%T", parsedJson["event_type"], parsedJson["event_type"])
 	}
 	event_type := uint8(floatVal)
-	if event_type == 2 || event_type == 3 {
+	if event_type == 2 || event_type == 3 || event_type == 4 {
 		timestampMsUnix := parsedJson["timestamp_ms"].(string)
 		convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
 		if convErr != nil {
@@ -909,7 +909,7 @@ func InsertVaultSubmitPerformanceFee(parsedJson map[string]interface{}, digest s
 		log.Printf("event_type 解析失败：值=%v, 类型=%T", parsedJson["event_type"], parsedJson["event_type"])
 	}
 	event_type := uint8(floatVal)
-	if event_type == 2 || event_type == 3 {
+	if event_type == 2 || event_type == 3 || event_type == 4 {
 		timestampMsUnix := parsedJson["timestamp_ms"].(string)
 		convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
 		if convErr != nil {
@@ -1287,7 +1287,7 @@ func InsertVaultSubmitSupplyCap(parsedJson map[string]interface{}, digest string
 		log.Printf("event_type 解析失败：值=%v, 类型=%T", parsedJson["event_type"], parsedJson["event_type"])
 	}
 	event_type := uint8(floatVal)
-	if event_type == 2 || event_type == 3 {
+	if event_type == 2 || event_type == 3 || event_type == 4 {
 		timestampMsUnix := parsedJson["timestamp_ms"].(string)
 		convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
 		if convErr != nil {

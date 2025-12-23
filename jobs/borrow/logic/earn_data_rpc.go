@@ -4,11 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"haedal-earn-borrow-server/common"
 	"log"
 	"strconv"
 	"strings"
 	"time"
+
+	"haedal-earn-borrow-server/common"
 
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
 	"github.com/block-vision/sui-go-sdk/models"
@@ -69,7 +70,7 @@ func ExecuteMoveInsertVaultYieldEarned(vaultInfo VaultModel, failRetryCount int)
 	if len(moveCallReturn) > 0 {
 		exchangeRate := "0"
 		for _, returnValue := range moveCallReturn[0].ReturnValues {
-			bcsBytes, _ := anyToBytes(returnValue.([]any)[0])
+			bcsBytes, _ := AnyToBytes(returnValue.([]any)[0])
 			deserializer := bcs.NewDeserializer(bcsBytes)
 			val := deserializer.U128()
 			exchangeRate = val.String()
@@ -81,6 +82,36 @@ func ExecuteMoveInsertVaultYieldEarned(vaultInfo VaultModel, failRetryCount int)
 	} else {
 		ExecuteMoveUpdateVaultYieldEarnedFailRetry(vaultInfo, failRetryCount)
 	}
+}
+
+func AssetAndHTokenEnumsType(vaultInfo VaultModel) ([]transaction.TypeTag, error) {
+	assetParts := strings.Split(vaultInfo.AssetType, "::")
+	if len(assetParts) < 3 {
+		// log.Printf("invalid vault AssetType type string: %v\n", vaultInfo.AssetType)
+		return nil, fmt.Errorf("invalid vault AssetType type string: %v\n", vaultInfo.AssetType)
+	}
+	htokenParts := strings.Split(vaultInfo.HtokenType, "::")
+	if len(htokenParts) < 3 {
+		// log.Printf("invalid vault HtokenType type string: %v\n", vaultInfo.HtokenType)
+		return nil, fmt.Errorf("invalid vault HtokenType type string: %v\n", vaultInfo.HtokenType)
+	}
+
+	assetAddressBytes, _ := transaction.ConvertSuiAddressStringToBytes(models.SuiAddress(assetParts[0]))
+	hTokenAddressBytes, _ := transaction.ConvertSuiAddressStringToBytes(models.SuiAddress(htokenParts[0]))
+	typeArguments := []transaction.TypeTag{{
+		Struct: &transaction.StructTag{
+			Address: *assetAddressBytes,
+			Module:  assetParts[1],
+			Name:    assetParts[2],
+		},
+	}, {
+		Struct: &transaction.StructTag{
+			Address: *hTokenAddressBytes,
+			Module:  htokenParts[1],
+			Name:    htokenParts[2],
+		},
+	}}
+	return typeArguments, nil
 }
 
 func ExecuteMoveUpdateVaultYieldEarnedFailRetry(vaultInfo VaultModel, failRetryCount int) {
@@ -117,8 +148,8 @@ func InsertVaultApy(vaultId string, exchangeRate string) {
 	yearApy := 0.00
 	if QueryRowIsValue(queryErr) {
 		preExchangeRateF, _ := strconv.ParseFloat(preApy.ExchangeRate, 64)
-		differenceInSeconds := currentNow.Unix() - preApy.TransactionTime.Unix()                               //上一次采集和当前采集相差秒
-		perSecondApy := ((exchangeRateF - preExchangeRateF) / preExchangeRateF) / float64(differenceInSeconds) //每秒apy
+		differenceInSeconds := currentNow.Unix() - preApy.TransactionTime.Unix()                               // 上一次采集和当前采集相差秒
+		perSecondApy := ((exchangeRateF - preExchangeRateF) / preExchangeRateF) / float64(differenceInSeconds) // 每秒apy
 		yearApy = perSecondApy * 60 * 60 * 24 * 365
 	}
 	sql := "insert into vault_apy(vault_id,exchange_rate,apy,transaction_time) value(?,?,?,?)"
