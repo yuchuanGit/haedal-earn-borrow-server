@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"haedal-earn-borrow-server/common"
 	"log"
 	"strconv"
 	"strings"
 	"time"
+
+	"haedal-earn-borrow-server/common"
 
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
 	"github.com/block-vision/sui-go-sdk/models"
@@ -32,7 +33,7 @@ func RpcRequestScanCreateVault() {
 		for _, event := range data.Events {
 			eventType := EventType(event.Type)
 			switch eventType {
-			case VaultEvent: //创建Vault
+			case VaultEvent: // 创建Vault
 				InsertVault(event.ParsedJson, digest, transactionTime)
 			}
 		}
@@ -228,12 +229,12 @@ type VaultModel struct {
 	VaultName         *string
 	AssetType         string
 	HtokenType        string
-	AssetDecimals     float64 //存入精度
-	TotalShares       string  //存入总的份额
-	AssetReserve      string  //总的闲置数量
-	SupplyCap         string  //Vault 最大存入数量
-	MaxDeposit        string  //Vault 单次最大存入数量
-	MinDeposit        string  //Vault 单次最小存入数量
+	AssetDecimals     float64 // 存入精度
+	TotalShares       string  // 存入总的份额
+	AssetReserve      string  // 总的闲置数量
+	SupplyCap         string  // Vault 最大存入数量
+	MaxDeposit        string  // Vault 单次最大存入数量
+	MinDeposit        string  // Vault 单次最小存入数量
 	ManagementFeeBps  string
 	PerformanceFeeBps string
 }
@@ -260,22 +261,22 @@ func QueryVaultInfoUpdate(vaultId string) {
 			fields := resp.Data.Content.Fields
 			vault_name, _ := fields["vault_name"].(string)
 			vm.VaultName = &vault_name
-			vm.AssetDecimals = fields["asset_decimals"].(float64) //存入精度
-			vm.TotalShares = fields["total_shares"].(string)      //存入总的份额
+			vm.AssetDecimals = fields["asset_decimals"].(float64) // 存入精度
+			vm.TotalShares = fields["total_shares"].(string)      // 存入总的份额
 			// vm.TotalShares = fmt.Sprintf("%.0f", total_shares)
-			vm.AssetReserve = fields["asset_reserve"].(string) //总的闲置数量
+			vm.AssetReserve = fields["asset_reserve"].(string) // 总的闲置数量
 			strategy := fields["strategy"].(map[string]interface{})
 			fees := fields["fees"].(map[string]interface{})
 			if strategy != nil {
 				strategyFields := strategy["fields"].(map[string]interface{})
-				vm.SupplyCap = strategyFields["supply_cap"].(string)   //Vault 最大存入数量
-				vm.MaxDeposit = strategyFields["max_deposit"].(string) //Vault 单次最大存入数量
-				vm.MinDeposit = strategyFields["min_deposit"].(string) //Vault 单次最小存入数量
+				vm.SupplyCap = strategyFields["supply_cap"].(string)   // Vault 最大存入数量
+				vm.MaxDeposit = strategyFields["max_deposit"].(string) // Vault 单次最大存入数量
+				vm.MinDeposit = strategyFields["min_deposit"].(string) // Vault 单次最小存入数量
 			}
 			if fees != nil {
 				feesFields := fees["fields"].(map[string]interface{})
-				vm.ManagementFeeBps = feesFields["management_fee_bps"].(string)   //Vault 管理费用
-				vm.PerformanceFeeBps = feesFields["performance_fee_bps"].(string) //Vault 绩效费用
+				vm.ManagementFeeBps = feesFields["management_fee_bps"].(string)   // Vault 管理费用
+				vm.PerformanceFeeBps = feesFields["performance_fee_bps"].(string) // Vault 绩效费用
 			}
 			VaultInfoUpdate(vm)
 		} else {
@@ -337,9 +338,9 @@ func RpcRequestScanVaultEvent(jobInfo ScheduledTaskRecord, isFinalTask bool) {
 	if len(resp.Data) == 0 {
 		log.Printf("RpcRequestScanVaultEvent lastCursor=%v\n", nextCursor)
 		if isFinalTask {
-			UpdateTimingTypeExecutionCompleted(false, ScheduledTaskTypeVault, 0) //更新所有Vault任务未执行
+			UpdateTimingTypeExecutionCompleted(false, ScheduledTaskTypeVault, 0) // 更新所有Vault任务未执行
 		} else {
-			UpdateTimingTypeExecutionCompleted(true, ScheduledTaskTypeVault, jobInfo.Id) //更新所有Vault任务已完成执行
+			UpdateTimingTypeExecutionCompleted(true, ScheduledTaskTypeVault, jobInfo.Id) // 更新所有Vault任务已完成执行
 		}
 		return
 	}
@@ -349,61 +350,63 @@ func RpcRequestScanVaultEvent(jobInfo ScheduledTaskRecord, isFinalTask bool) {
 		for _, event := range data.Events {
 			eventType := EventType(event.Type)
 			switch eventType {
-			case SetAllocationEvent: //设置cap
+			case SetAllocationEvent: // 设置cap
 				SetAllocationCap(event.ParsedJson, digest, transactionTimeUnix)
-			case SetSupplyQueueEvent: //设置存款队列，Vault和Market相关联
+			case SetSupplyQueueEvent: // 设置存款队列，Vault和Market相关联
 				InsertVaultSupplyQueue(event.ParsedJson, digest, transactionTimeUnix)
-			case SetWithdrawQueueEvent: //设置取款队列，Vault和Market相关联
+			case SetWithdrawQueueEvent: // 设置取款队列，Vault和Market相关联
 				InsertWithdrawSupplyQueue(event.ParsedJson, digest, transactionTimeUnix)
-			case SetCuratorEvent: //Vault设置更新Curator记录
+			case SetOwnerEvent: // Vault设置更新owner记录
+				InsertVaultSetOwnerRecord(event.ParsedJson, digest, transactionTimeUnix)
+			case SetCuratorEvent: // Vault设置更新Curator记录
 				InsertVaultSetCuratorRecord(event.ParsedJson, digest, transactionTimeUnix)
-			case SetAllocatorEvent: //Vault设置更新Allocator记录
+			case SetAllocatorEvent: // Vault设置更新Allocator记录
 				InsertVaultSetAllocatorRecord(event.ParsedJson, digest, transactionTimeUnix)
-			case SubmitTimelockEvent: //提交时间锁记录
+			case SubmitTimelockEvent: // 提交时间锁记录
 				InsertVaultSubmitTimeLock(event.ParsedJson, digest, transactionTimeUnix)
-			case SetGuardianEvent: //设置更新Guardian记录
+			case SetGuardianEvent: // 设置更新Guardian记录
 				InsertVaultSetGuardian(event.ParsedJson, digest, transactionTimeUnix)
-			case RevokePendingEvent: //Vault撤销待定记录
+			case RevokePendingEvent: // Vault撤销待定记录
 				InsertVaultRevokePending(event.ParsedJson, digest, transactionTimeUnix)
-			case SubmitSupplyCapEvent: //vault提交生效cap
+			case SubmitSupplyCapEvent: // vault提交生效cap
 				InsertVaultSubmitSupplyCap(event.ParsedJson, digest, transactionTimeUnix)
-			case ApplySupplyCapEvent: //vault应用存入上限cap
+			case ApplySupplyCapEvent: // vault应用存入上限cap
 				InsertVaultApplySupplyCap(event.ParsedJson, digest, transactionTimeUnix)
-			case SubmitMarketRemovalEvent: //vault提交移除Market
+			case SubmitMarketRemovalEvent: // vault提交移除Market
 				InsertVaultSubmitMarketRemoval(event.ParsedJson, digest, transactionTimeUnix)
-			case RemoveMarketEvent: //vault提交移除Market
+			case RemoveMarketEvent: // vault提交移除Market
 				InsertVaultRemoveMarket(event.ParsedJson, digest, transactionTimeUnix)
-			case SetMinDepositEvent: //vault设置最小押金
+			case SetMinDepositEvent: // vault设置最小押金
 				InsertVaultSetMinDeposit(event.ParsedJson, digest, transactionTimeUnix)
-			case SetMaxDepositEvent: //vault设置最大押金
+			case SetMaxDepositEvent: // vault设置最大押金
 				InsertVaultSetMaxDeposit(event.ParsedJson, digest, transactionTimeUnix)
-			case SetWithdrawCooldownEvent: //vault设置提款冷却事件
+			case SetWithdrawCooldownEvent: // vault设置提款冷却事件
 				InsertVaultSetWithdrawCooldown(event.ParsedJson, digest, transactionTimeUnix)
-			case SetMinRebalanceIntervalEvent: //设置最小再平衡间隔
+			case SetMinRebalanceIntervalEvent: // 设置最小再平衡间隔
 				InsertVaultSetMinRebalanceInterval(event.ParsedJson, digest, transactionTimeUnix)
-			case UpdateLastRebalanceEvent: //更新上次重新平衡事件
+			case UpdateLastRebalanceEvent: // 更新上次重新平衡事件
 				InsertVaultUpdateLastRebalance(event.ParsedJson, digest, transactionTimeUnix)
-			case SetFeeRecipientEvent: //设置费用接收人
+			case SetFeeRecipientEvent: // 设置费用接收人
 				InsertVaultSetFeeRecipient(event.ParsedJson, digest, transactionTimeUnix)
-			case SubmitPerformanceFeeEvent: //提交绩效费
+			case SubmitPerformanceFeeEvent: // 提交绩效费
 				InsertVaultSubmitPerformanceFee(event.ParsedJson, digest, transactionTimeUnix)
-			case ApplyPerformanceFeeEvent: //申请绩效费
+			case ApplyPerformanceFeeEvent: // 申请绩效费
 				InsertVaultApplyPerformanceFee(event.ParsedJson, digest, transactionTimeUnix)
-			case SubmitManagementFeeEvent: //提交管理费
+			case SubmitManagementFeeEvent: // 提交管理费
 				InsertVaultSubmitmentFee(event.ParsedJson, digest, transactionTimeUnix)
-			case ApplyManagementFeeEvent: //申请管理费
+			case ApplyManagementFeeEvent: // 申请管理费
 				InsertVaultApplyManagementFee(event.ParsedJson, digest, transactionTimeUnix)
-			case VaultDepositEvent: //用户存入Vault池
+			case VaultDepositEvent: // 用户存入Vault池
 				InsertVaultDeposit(event.ParsedJson, digest, transactionTimeUnix)
-			case VaultWithdrawEvent: //用户取出Vault池
+			case VaultWithdrawEvent: // 用户取出Vault池
 				InsertVaultWithdraw(event.ParsedJson, digest, transactionTimeUnix)
-			case SetVaultNameEvent: //设置Vault名称
+			case SetVaultNameEvent: // 设置Vault名称
 				InsertVaultSetName(event.ParsedJson, digest, transactionTimeUnix)
-			case CompensateLostAssetsEvent: //Vault补偿损失资产
+			case CompensateLostAssetsEvent: // Vault补偿损失资产
 				InsertVaultCompensateLostAssets(event.ParsedJson, digest, transactionTimeUnix)
-			case AccrueFeesEvent: //Vault池应计费用
+			case AccrueFeesEvent: // Vault池应计费用
 				InsertVaultAccrueFees(event.ParsedJson, digest, transactionTimeUnix)
-			case RebalanceEvent: //Vault池Rebalance
+			case RebalanceEvent: // Vault池Rebalance
 				InsertVaultRebalance(event.ParsedJson, digest, transactionTimeUnix)
 			}
 		}
@@ -487,10 +490,10 @@ func QueryVaultExecutionInputObjectId() []ScheduledTaskRecord {
 
 type ScheduledTaskRecord struct {
 	Id                 int
-	TimingType         string  //定时类型 1 borrow事件扫描 2.vault事件扫描'
-	Digest             *string //下一次扫描事件游标
-	InputObjectId      string  //扫描交易合约函数入参id
-	ExecutionCompleted bool    //扫描是否完成 0 为完成 1 完成
+	TimingType         string  // 定时类型 1 borrow事件扫描 2.vault事件扫描'
+	Digest             *string // 下一次扫描事件游标
+	InputObjectId      string  // 扫描交易合约函数入参id
+	ExecutionCompleted bool    // 扫描是否完成 0 为完成 1 完成
 }
 
 func EventRpcRequest(req models.SuiXQueryTransactionBlocksRequest) models.SuiXQueryTransactionBlocksResponse {
@@ -755,7 +758,7 @@ func InsertVaultSetName(parsedJson map[string]interface{}, digest string, transa
 	}
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("vault_set_name新增id：=%v", lastInsertID)
-	//todo vault 表更新最新名称
+	// todo vault 表更新最新名称
 	defer con.Close()
 }
 
@@ -943,7 +946,6 @@ func InsertVaultSubmitPerformanceFee(parsedJson map[string]interface{}, digest s
 		log.Printf("vault_submit_performance_fee新增id：=%v", lastInsertID)
 		defer con.Close()
 	}
-
 }
 
 func InsertVaultApplyManagementFee(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
@@ -1322,7 +1324,6 @@ func InsertVaultSubmitSupplyCap(parsedJson map[string]interface{}, digest string
 		log.Printf("vault_submit_supply_cap新增id：=%v", lastInsertID)
 		defer con.Close()
 	}
-
 }
 
 func InsertVaultApplySupplyCap(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
@@ -1408,6 +1409,7 @@ func InsertVaultSubmitMarketRemoval(parsedJson map[string]interface{}, digest st
 	log.Printf("vault_submit_market_removal新增id：=%v", lastInsertID)
 	defer con.Close()
 }
+
 func InsertVaultRemoveMarket(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
 	vaultId := parsedJson["vault_id"].(string)
 	caller := parsedJson["caller"].(string)
@@ -1508,14 +1510,14 @@ func InsertVaultSetGuardian(parsedJson map[string]interface{}, digest string, tr
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_set_guardian_record where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from vault_set_guardian_record where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
-		log.Printf("vault_set_guardian_record查询 digest失败: %v", queryErr)
+		log.Printf("vault_set_guardian_record查询 digest+vaultId失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("vault_set_guardian_record digest exist :%v\n", digest)
+		fmt.Printf("vault_set_guardian_record digest+vaultId exist :%v,%v\n", digest, vaultId)
 		defer queryRs.Close()
 		defer con.Close()
 		return
@@ -1602,14 +1604,14 @@ func InsertVaultSetAllocatorRecord(parsedJson map[string]interface{}, digest str
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_set_allocator_record where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from vault_set_allocator_record where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
-		log.Printf("vault_set_allocator_record查询 digest失败: %v", queryErr)
+		log.Printf("vault_set_allocator_record查询 digest+vaultId失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("vault_set_allocator_record digest exist :%v\n", digest)
+		fmt.Printf("vault_set_allocator_record digest+vaultId exist :%v,%v\n", digest, vaultId)
 		defer queryRs.Close()
 		defer con.Close()
 		return
@@ -1636,6 +1638,58 @@ func InsertVaultSetAllocatorRecord(parsedJson map[string]interface{}, digest str
 	defer con.Close()
 }
 
+func InsertVaultSetOwnerRecord(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
+	vaultId := parsedJson["vault_id"].(string)
+	caller := parsedJson["caller"].(string)
+	previous_owner := parsedJson["previous_owner"].(string)
+	new_owner := parsedJson["new_owner"].(string)
+	timestampMsUnix := parsedJson["timestamp_ms"].(string)
+	convRs, convErr := strconv.ParseInt(timestampMsUnix, 10, 64)
+	if convErr != nil {
+		log.Printf("转换失败：%v\n", convErr)
+	}
+	timestampMs := time.UnixMilli(convRs)
+	ttConvRs, ttConvErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
+	if ttConvErr != nil {
+		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
+	}
+	transactionTime := time.UnixMilli(ttConvRs)
+	con := common.GetDbConnection()
+	queryRs, queryErr := con.Query("select * from vault_set_owner_record where digest=? and vault_id=?", digest, vaultId)
+	if queryErr != nil {
+		log.Printf("vault_set_owner_record查询 digest+vaultId失败: %v", queryErr)
+		defer con.Close()
+		return
+	}
+	if queryRs.Next() {
+		fmt.Printf("vault_set_owner_record digest+vaultId exist :%v,%v\n", digest, vaultId)
+		defer queryRs.Close()
+		defer con.Close()
+		return
+	}
+
+	sql := "insert into vault_set_owner_record(vault_id,caller,previous_owner,new_owner,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?)"
+	result, err := con.Exec(sql, vaultId, caller, previous_owner, new_owner, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
+	if err != nil {
+		log.Printf("vault_set_owner_record新增失败: %v", err)
+		defer con.Close()
+		return
+	}
+	lastInsertID, _ := result.LastInsertId()
+	log.Printf("vault_set_owner_record新增id：=%v", lastInsertID)
+
+	upVaultSql := "update vault set owner=? where vault_id=?"
+	rsUp, errUp := con.Exec(upVaultSql, new_owner, vaultId)
+	if errUp != nil {
+		log.Printf("vault owner更新失败: %v", errUp)
+		defer con.Close()
+		return
+	}
+	updateRowCount, _ := rsUp.RowsAffected()
+	log.Printf("vault owner updateRowCount=:%d\n", updateRowCount)
+	defer con.Close()
+}
+
 func InsertVaultSetCuratorRecord(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
 	vaultId := parsedJson["vault_id"].(string)
 	caller := parsedJson["caller"].(string)
@@ -1653,14 +1707,14 @@ func InsertVaultSetCuratorRecord(parsedJson map[string]interface{}, digest strin
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from vault_set_curator_record where digest=?", digest)
+	queryRs, queryErr := con.Query("select * from vault_set_curator_record where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
-		log.Printf("vault_set_curator_record查询 digest失败: %v", queryErr)
+		log.Printf("vault_set_curator_record查询 digest+vaultId失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		fmt.Printf("vault_set_curator_record digest exist :%v\n", digest)
+		fmt.Printf("vault_set_curator_record digest+vaultId exist :%v,%v\n", digest, vaultId)
 		defer queryRs.Close()
 		defer con.Close()
 		return
