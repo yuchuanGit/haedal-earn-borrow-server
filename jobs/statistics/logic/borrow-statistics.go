@@ -19,7 +19,7 @@ func MarketTimeCollection() {
 	markets := QueryBorrowAll()
 	if len(markets) > 0 {
 		transaction_time := time.Now()
-		transaction_time = transaction_time.Add(-30 * time.Second) //当前时间30秒前
+		transaction_time = transaction_time.Add(-5 * time.Second) //当前时间5秒前
 		for _, market := range markets {
 			BorrowTimeCollection(market, transaction_time, 2)
 			BorrowSupplyTimeCollection(market, transaction_time, 2)
