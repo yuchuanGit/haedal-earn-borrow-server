@@ -311,8 +311,10 @@ func UpdateBorrowRate(marketId uint64, con *sql.DB) {
 			liquidityProportion = (totalBorrowAssets / (totalSupplyAssets * maxUtilization)) * 100
 		}
 		liquidity := totalSupplyAssets - totalBorrowAssets
+		year := 60 * 60 * 24 * 365
+		yearF := float64(year)
 		supplyRate = supplyRate / baseUnit
-		borrowRate = borrowRate / baseUnit
+		borrowRate = (borrowRate * yearF) / baseUnit
 		supplyRateStr := fmt.Sprintf("%.2f", supplyRate) + "%"
 		borrowRateStr := fmt.Sprintf("%.2f", borrowRate) + "%"
 		if supplyRate == 0 {
