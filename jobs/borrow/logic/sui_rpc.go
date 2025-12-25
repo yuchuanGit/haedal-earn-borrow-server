@@ -320,8 +320,8 @@ func UpdateBorrowRate(marketId uint64, con *sql.DB) {
 		} else if supplyRate < 0.01 {
 			supplyRateStr = "<0.01%"
 		}
-		if supplyRate == 0 {
-			supplyRateStr = "0%"
+		if borrowRate == 0 {
+			borrowRateStr = "0%"
 		} else if borrowRate < 0.01 {
 			borrowRateStr = "<0.01%"
 		}
