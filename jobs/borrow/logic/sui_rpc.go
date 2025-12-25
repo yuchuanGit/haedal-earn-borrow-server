@@ -315,10 +315,14 @@ func UpdateBorrowRate(marketId uint64, con *sql.DB) {
 		borrowRate = borrowRate / baseUnit
 		supplyRateStr := fmt.Sprintf("%.2f", supplyRate) + "%"
 		borrowRateStr := fmt.Sprintf("%.2f", borrowRate) + "%"
-		if supplyRate < 0.01 {
+		if supplyRate == 0 {
+			supplyRateStr = "0%"
+		} else if supplyRate < 0.01 {
 			supplyRateStr = "<0.01%"
 		}
-		if borrowRate < 0.01 {
+		if supplyRate == 0 {
+			supplyRateStr = "0%"
+		} else if borrowRate < 0.01 {
 			borrowRateStr = "<0.01%"
 		}
 		liquidityProportionStr := fmt.Sprintf("%.16f", liquidityProportion)
