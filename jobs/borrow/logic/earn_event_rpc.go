@@ -632,6 +632,9 @@ func InsertVaultAccrueFees(parsedJson map[string]interface{}, digest string, tra
 	vaultId := parsedJson["vault_id"].(string)
 	management_fee_shares := parsedJson["management_fee_shares"].(string)
 	performance_fee_shares := parsedJson["performance_fee_shares"].(string)
+	last_total_assets := parsedJson["last_total_assets"].(string)
+	management_fee_assets := parsedJson["management_fee_assets"].(string)
+	performance_fee_assets := parsedJson["performance_fee_assets"].(string)
 	total_shares_minted := parsedJson["total_shares_minted"].(string)
 	total_assets := parsedJson["total_assets"].(string)
 	asset_type := parsedJson["asset_type"].(map[string]interface{})["name"].(string)
@@ -661,8 +664,8 @@ func InsertVaultAccrueFees(parsedJson map[string]interface{}, digest string, tra
 		return
 	}
 
-	sql := "insert into vault_accrue_fees(vault_id,management_fee_shares,performance_fee_shares,total_shares_minted,total_assets,asset_type,htoken_type,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?,?)"
-	result, err := con.Exec(sql, vaultId, management_fee_shares, performance_fee_shares, total_shares_minted, total_assets, asset_type, htoken_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
+	sql := "insert into vault_accrue_fees(vault_id,management_fee_shares,performance_fee_shares,last_total_assets,management_fee_assets,performance_fee_assets,total_shares_minted,total_assets,asset_type,htoken_type,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+	result, err := con.Exec(sql, vaultId, management_fee_shares, performance_fee_shares, last_total_assets, management_fee_assets, performance_fee_assets, total_shares_minted, total_assets, asset_type, htoken_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("vault_accrue_fees新增失败: %v", err)
 		defer con.Close()
