@@ -800,7 +800,7 @@ func InsertVaultWithdraw(parsedJson map[string]interface{}, digest string, trans
 	sql := "insert into vault_withdraw(vault_id,user,asset_amount,shares_burned,asset_type,htoken_type,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?)"
 	sqlDw := "insert into vault_deposit_withdraw(vault_id,operation_type,user,asset_amount,shares,asset_type,htoken_type,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?,?)"
 	result, err := con.Exec(sql, vaultId, user, asset_amount, shares_burned, asset_type, htoken_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
-	resultDw, errDw := con.Exec(sqlDw, vaultId, "withdraw", user, asset_amount, shares_burned, asset_type, htoken_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
+	resultDw, errDw := con.Exec(sqlDw, vaultId, "Withdraw", user, asset_amount, shares_burned, asset_type, htoken_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("vault_withdraw新增失败: %v", err)
 		defer con.Close()
@@ -854,7 +854,7 @@ func InsertVaultDeposit(parsedJson map[string]interface{}, digest string, transa
 	sql := "insert into vault_deposit(vault_id,user,asset_amount,shares_minted,asset_type,htoken_type,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?)"
 	sqlDw := "insert into vault_deposit_withdraw(vault_id,operation_type,user,asset_amount,shares,asset_type,htoken_type,timestamp_ms_unix,timestamp_ms,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?,?)"
 	result, err := con.Exec(sql, vaultId, user, asset_amount, shares_minted, asset_type, htoken_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
-	resultDw, errDw := con.Exec(sqlDw, vaultId, "deposit", user, asset_amount, shares_minted, asset_type, htoken_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
+	resultDw, errDw := con.Exec(sqlDw, vaultId, "Deposit", user, asset_amount, shares_minted, asset_type, htoken_type, timestampMsUnix, timestampMs, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("vault_deposit新增失败: %v", err)
 		defer con.Close()
