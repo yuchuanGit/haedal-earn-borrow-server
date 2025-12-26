@@ -521,6 +521,17 @@ func EventType(typeStr string) string {
 	return resultType
 }
 
+func getCoinMetaInfo(coinType string) (*models.CoinMetadataResponse, error) {
+	cli := sui.NewSuiClient(SuiEnv)
+	ctx := context.Background()
+	rsp, err := cli.SuiXGetCoinMetadata(ctx, models.SuiXGetCoinMetadataRequest{CoinType: coinType})
+	if err != nil {
+		log.Printf("getCoinMetaInfo fail:%v", err.Error())
+		return nil, err
+	}
+	return &rsp, nil
+}
+
 func InsertVault(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
 	vault_id := parsedJson["vault_id"].(string)
 	owner := parsedJson["owner"].(string)
@@ -530,7 +541,13 @@ func InsertVault(parsedJson map[string]interface{}, digest string, transactionTi
 	asset_decimals := parsedJson["asset_decimals"]
 	asset_type := parsedJson["asset_type"].(map[string]interface{})["name"].(string)
 	htoken_type := parsedJson["htoken_type"].(map[string]interface{})["name"].(string)
-
+	htoken_decimals := 0
+	coinMetadata, coinErr := getCoinMetaInfo("0x" + htoken_type)
+	if coinErr != nil {
+		log.Printf("invoke getCoinMetaInfo fail:%v", coinErr.Error())
+	} else {
+		htoken_decimals = coinMetadata.Decimals
+	}
 	convRs, convErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
 	if convErr != nil {
 		log.Printf("转换失败：%v\n", convErr)
@@ -549,8 +566,8 @@ func InsertVault(parsedJson map[string]interface{}, digest string, transactionTi
 		defer con.Close()
 		return
 	}
-	sql := "insert into vault(vault_id,owner,curator,allocator,guardian,asset_decimals,asset_type,htoken_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?)"
-	result, err := con.Exec(sql, vault_id, owner, curator, allocator, guardian, asset_decimals, asset_type, htoken_type, digest, transactionTimeUnix, transactionTime)
+	sql := "insert into vault(vault_id,owner,curator,allocator,guardian,asset_decimals,asset_type,htoken_decimals,htoken_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?,?)"
+	result, err := con.Exec(sql, vault_id, owner, curator, allocator, guardian, asset_decimals, asset_type, htoken_decimals, htoken_type, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("vault新增失败: %v", err)
 		defer con.Close()
