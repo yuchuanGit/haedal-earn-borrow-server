@@ -278,6 +278,7 @@ func InsertBorroWithdraw(parsedJson map[string]interface{}, digest string, trans
 	market_id := parsedJson["market_id"].(string)
 	caller_address := parsedJson["caller"].(string)
 	on_behalf_address := parsedJson["on_behalf"].(string)
+	receiver := parsedJson["receiver"].(string)
 	assets := parsedJson["assets"].(string)
 	shares := parsedJson["shares"].(string)
 	collateralType := parsedJson["collateral_token_type"].(map[string]interface{})["name"].(string)
@@ -300,8 +301,10 @@ func InsertBorroWithdraw(parsedJson map[string]interface{}, digest string, trans
 		defer con.Close()
 		return
 	}
-	sql := "insert into borrow_withdraw(market_id,caller,on_behalf,assets,shares,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
-	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, assets, shares, collateralType, loanlType, digest, transactionTimeUnix, transactionTime)
+	sql := "insert into borrow_withdraw(market_id,caller,on_behalf,receiver,assets,shares,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?)"
+	sqlDw := "insert into borrow_assets_supply_withdraw(operation_type,market_id,caller,on_behalf,receiver,assets,shares,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?,?)"
+	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, receiver, assets, shares, collateralType, loanlType, digest, transactionTimeUnix, transactionTime)
+	resultDw, errDw := con.Exec(sqlDw, "Withdraw", market_id, caller_address, on_behalf_address, receiver, assets, shares, collateralType, loanlType, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("borrow_withdraw新增失败: %v", err)
 		defer con.Close()
@@ -309,6 +312,13 @@ func InsertBorroWithdraw(parsedJson map[string]interface{}, digest string, trans
 	}
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("borrow_withdraw新增id：=%v", lastInsertID)
+	if errDw != nil {
+		log.Printf("borrow_assets_supply_withdraw新增失败: %v", errDw)
+		defer con.Close()
+		return
+	}
+	dwLastInsertID, _ := resultDw.LastInsertId()
+	log.Printf("borrow_assets_supply_withdraw新增id：=%v", dwLastInsertID)
 	defer con.Close() // 程序退出时关闭数据库连接
 }
 
@@ -527,29 +537,24 @@ func InsertBorrowSupplyDetali(parsedJson map[string]interface{}, digest string, 
 	}
 
 	sql := "insert into borrow_supply_detail(supply_type,market_id,caller_address,on_behalf_address,assets,shares,digest,transaction_time_unix,transaction_time,collateral_token_type,loan_token_type) value(?,?,?,?,?,?,?,?,?,?,?)"
+	sqlDw := "insert into borrow_assets_supply_withdraw(operation_type,market_id,caller,on_behalf,assets,shares,digest,transaction_time_unix,transaction_time,collateral_token_type,loan_token_type) value(?,?,?,?,?,?,?,?,?,?,?)"
 	result, err := con.Exec(sql, 1, market_id, caller_address, on_behalf_address, assets, shares, digest, transactionTimeUnix, transactionTime, collateralType, loanType)
+	resultDw, errDw := con.Exec(sqlDw, "Deposit", market_id, caller_address, on_behalf_address, assets, shares, digest, transactionTimeUnix, transactionTime, collateralType, loanType)
 	if err != nil {
-		log.Printf("新增失败: %v", err)
+		log.Printf("borrow_supply_detail 新增失败: %v", err)
 		defer con.Close()
 		return
 	}
 	lastInsertID, _ := result.LastInsertId()
-	log.Printf("borrow_supply_detail新增id：=%v", lastInsertID)
+	log.Printf("borrow_supply_detail 新增id：=%v", lastInsertID)
 
-	// borrowRs, borrowErr := con.Query("select * from borrow where market_id=?", market_id)
-	// if borrowErr != nil {
-	// 	log.Printf("borrow查询market_id失败: %v", borrowErr)
-	// 	return
-	// }
-	// if borrowRs.Next() {
-	// 	upRs, upErr := con.Exec("update borrow set total_supply_amount=total_supply_amount+? where market_id=?", assets, market_id)
-	// 	if upErr != nil {
-	// 		log.Printf("borrow 更新失败: %v", upErr)
-	// 		return
-	// 	}
-	// 	upRow, _ := upRs.RowsAffected()
-	// 	log.Printf("borrow 更新条数: %v", upRow)
-	// }
+	if errDw != nil {
+		log.Printf("borrow_assets_supply_withdraw 新增失败: %v", errDw)
+		defer con.Close()
+		return
+	}
+	dwLastInsertID, _ := resultDw.LastInsertId()
+	log.Printf("borrow_assets_supply_withdraw新增id：=%v", dwLastInsertID)
 	defer con.Close() // 程序退出时关闭数据库连接
 }
 
