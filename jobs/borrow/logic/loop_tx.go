@@ -15,30 +15,19 @@ import (
 )
 
 const (
-	// PackageId     = "0x7ba1b0d26e44022cf26e2e7f6b188495ddfb9c53cc6147723d2ff5deaff20bde" //11-26 16:00
-	// HEarnObjectId = "0xb999d1d9d5d0f053a7572021d4e00618c729caf07f1d4a0a6c93164d32215a3f"
-	// PackageId      = "0xd44cf630ff04308f3a08f161aa0378b71f399d644c3af58d6dcf4a58e3963e8c" //12-03
-	// HEarnObjectId  = "0xfa50ba56632a857630cbfde7871f7b8b738227e971ebf6c46173f928a6880373"
-	// PackageId      = "0x3279683b5157ce56a3d25a92b354750472053c31dd139771752d437ba8797906" //12-09 18:00
-	// HEarnObjectId  = "0x42cbdc7214c46b55096fd76f9bed12382dd68216ec5147cd18624ff539dff04e"
-	// PackageId      = "0x3746d5bebba155df504b352c16cf91f92d7b23042256be85338938b4c8fc8a53" //12-11 17:00
-	// HEarnObjectId  = "0xc4cf77c655e2c6f0d9482bdff1a01094145fe0649b401d36ebccb8690dcbcb4c"
-	// PackageId         = "0xa6397390685ea1dbba886433d00cb26da2bbb986408dc6599eb18579d9e5a5b2" //12-12 14:00
-	// HEarnObjectId     = "0x491d7fd420ac60a7618484880a47865ea46165c861628c208318ad3774b7a6d8"
-	// PackageId         = "0x4a946a41d1470f9510abafe91416f33cb1ba71a88b314e19da0253ecba9b9e99" //12-16 11:00
-	// HEarnObjectId     = "0x082de782f879b8a06666c14238221456c965707f356a4ca1b73e6b9ff2d19b63"
-	// PackageId         = "0x4f7369507fbcb3118bf11c8c40fd0fba4d4fbfd49191ac16b9bf4a718d29d0a5" //12-17 09:10
-	// HEarnObjectId     = "0xc910c86b33b5f27d027465cb84cc6ce800fef12176164acdceb2b3f236ffeb44"
-	// OracleObjectId    = "0xbcf3d92d68be8162ca5f56fd2dee5cb48d262bdd4361b2318b743fe333d5603d"
 	// PackageId         = "0x3bb6c9ecec37aa47a6b7cc40ddfb014004d6495f6733243e34482838ea956a0e" //12-17 20:47
 	// HEarnObjectId     = "0xa125076a0bc69578e7e9f60ba4a96b742604e02f1c3fc2f8994e9a3b37183bba"
 	// OracleObjectId    = "0x78f30de7d853e3245f82eafe639c149316e989bb6a33e5b6346c577475f04bf3"
 	// PackageId         = "0x74640585be1b236885fe461c18f9a31aedd78cf9444d6af4e63b065940e41cdc" // 12-19 11:15
 	// HEarnObjectId     = "0x0a1be2504d6e5a23fea45692558baf0b2f68166448c6f70d80148979c0b10dbb"
 	// OracleObjectId    = "0xc745cc48a1e67312e5cc637d9c54a85065a5b718d16a13afb3fbf025b0aed918"
-	PackageId         = "0xa192fea008b04b3627a125c7774de1364a5b4d4e59345f6602be21a5adfc920a" // 12-23 11:25
-	HEarnObjectId     = "0xa4e27805c7bc0587a7907cb20fad95a1925bab4fca022d3337510812d368f0f1"
-	OracleObjectId    = "0x83095db301ef05c51a5868806be87feb530b1ca333652f8adb61cdfbb3c8dceb"
+	// PackageId         = "0xa192fea008b04b3627a125c7774de1364a5b4d4e59345f6602be21a5adfc920a" // 12-23 11:25
+	// HEarnObjectId     = "0xa4e27805c7bc0587a7907cb20fad95a1925bab4fca022d3337510812d368f0f1"
+	// OracleObjectId    = "0x83095db301ef05c51a5868806be87feb530b1ca333652f8adb61cdfbb3c8dceb"
+	PackageId         = "0xfedd869c200a819d4d8a440b29a082dbf227fd773fb4d88bf34df53435f005b4" // 12-29 15:13
+	HEarnObjectId     = "0xa86275de9aa81366d14599ee3fe65c1de9c716e85a917a0a5b2e2dfa8fd95d18"
+	OracleObjectId    = "0x155b1743460d76503bee9d7b3f1d686ebe3bcd572eeb200c257ddb8a8a4dc81d"
+	FarmingObjectId   = "0x035f5a1b09ea99927a2dd811742b10cd456be323200bc1fdda6e17bbfef65cf7"
 	SuiUserAddress    = "0x438796b44e606f8768c925534ebb87be9ded13cc51a6ddd955e6e40ab85db6f5"
 	SuiBlockvisionEnv = "https://sui-testnet-endpoint.blockvision.org"
 	SuiEnv            = "https://fullnode.testnet.sui.io:443"
@@ -302,7 +291,7 @@ func InsertBorroWithdraw(parsedJson map[string]interface{}, digest string, trans
 		return
 	}
 	sql := "insert into borrow_withdraw(market_id,caller,on_behalf,receiver,assets,shares,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?)"
-	sqlDw := "insert into borrow_assets_supply_withdraw(operation_type,market_id,caller,on_behalf,receiver,assets,shares,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?,?)"
+	sqlDw := "insert into borrow_assets_operation_record(operation_type,market_id,caller,on_behalf,receiver,assets,shares,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?,?)"
 	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, receiver, assets, shares, collateralType, loanlType, digest, transactionTimeUnix, transactionTime)
 	resultDw, errDw := con.Exec(sqlDw, "Withdraw", market_id, caller_address, on_behalf_address, receiver, assets, shares, collateralType, loanlType, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
@@ -313,12 +302,12 @@ func InsertBorroWithdraw(parsedJson map[string]interface{}, digest string, trans
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("borrow_withdraw新增id：=%v", lastInsertID)
 	if errDw != nil {
-		log.Printf("borrow_assets_supply_withdraw新增失败: %v", errDw)
+		log.Printf("borrow_assets_operation_record 新增失败: %v", errDw)
 		defer con.Close()
 		return
 	}
 	dwLastInsertID, _ := resultDw.LastInsertId()
-	log.Printf("borrow_assets_supply_withdraw新增id：=%v", dwLastInsertID)
+	log.Printf("borrow_assets_operation_record 新增id：=%v", dwLastInsertID)
 	defer con.Close() // 程序退出时关闭数据库连接
 }
 
@@ -349,7 +338,9 @@ func InsertBorroWithdrawCollateral(parsedJson map[string]interface{}, digest str
 		return
 	}
 	sql := "insert into borrow_withdraw_collateral(market_id,caller_address,on_behalf_address,receiver,assets,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
+	sqlOr := "insert into borrow_assets_operation_record(operation_type,market_id,caller,on_behalf,receiver,assets,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?)"
 	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, receiver_address, assets, collateralType, loanlType, digest, transactionTimeUnix, transactionTime)
+	resultOr, errOr := con.Exec(sqlOr, "CollateralWithdraw", market_id, caller_address, on_behalf_address, receiver_address, assets, collateralType, loanlType, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("borrow_withdraw_collateral新增失败: %v", err)
 		defer con.Close()
@@ -357,6 +348,13 @@ func InsertBorroWithdrawCollateral(parsedJson map[string]interface{}, digest str
 	}
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("borrow_withdraw_collateral新增id：=%v", lastInsertID)
+	if errOr != nil {
+		log.Printf("borrow_assets_operation_record 新增失败: %v", errOr)
+		defer con.Close()
+		return
+	}
+	orLastInsertID, _ := resultOr.LastInsertId()
+	log.Printf("borrow_assets_operation_record 新增id：=%v", orLastInsertID)
 	defer con.Close() // 程序退出时关闭数据库连接
 }
 
@@ -388,7 +386,9 @@ func InsertBorrowRepayDetali(parsedJson map[string]interface{}, digest string, t
 	}
 
 	sql := "insert into borrow_repay_detail(market_id,caller_address,on_behalf_address,assets,shares,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?)"
+	sqlOR := "insert into borrow_assets_operation_record(operation_type,market_id,caller,on_behalf,assets,shares,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?)"
 	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, assets, shares, collateral_token_type, loan_token_type, digest, transactionTimeUnix, transactionTime)
+	resultOR, errOR := con.Exec(sqlOR, "Repay", market_id, caller_address, on_behalf_address, assets, shares, collateral_token_type, loan_token_type, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("borrow_repay_detail新增失败: %v", err)
 		defer con.Close()
@@ -396,6 +396,14 @@ func InsertBorrowRepayDetali(parsedJson map[string]interface{}, digest string, t
 	}
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("borrow_repay_detail新增id：=%v", lastInsertID)
+
+	if errOR != nil {
+		log.Printf("borrow_assets_operation_record 新增失败: %v", errOR)
+		defer con.Close()
+		return
+	}
+	orLastInsertID, _ := resultOR.LastInsertId()
+	log.Printf("borrow_assets_operation_record 新增id：=%v", orLastInsertID)
 	defer con.Close() // 程序退出时关闭数据库连接
 }
 
@@ -428,7 +436,9 @@ func InsertBorrowDetali(parsedJson map[string]interface{}, digest string, transa
 	}
 
 	sql := "insert into borrow_detail(market_id,caller_address,on_behalf_address,receiver_address,assets,shares,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?)"
+	sqlR := "insert into borrow_assets_operation_record(operation_type,market_id,caller,on_behalf,receiver,assets,shares,collateral_token_type,loan_token_type,digest,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?,?,?,?,?)"
 	result, err := con.Exec(sql, market_id, caller_address, on_behalf_address, receiver_address, assets, shares, collateral_token_type, loan_token_type, digest, transactionTimeUnix, transactionTime)
+	resultR, errR := con.Exec(sqlR, "Borrow", market_id, caller_address, on_behalf_address, receiver_address, assets, shares, collateral_token_type, loan_token_type, digest, transactionTimeUnix, transactionTime)
 	if err != nil {
 		log.Printf("borrow_detail新增失败: %v", err)
 		defer con.Close()
@@ -436,22 +446,13 @@ func InsertBorrowDetali(parsedJson map[string]interface{}, digest string, transa
 	}
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("borrow_detail新增id：=%v", lastInsertID)
-
-	// borrowRs, borrowErr := con.Query("select * from borrow where market_id=?", market_id)
-	// if borrowErr != nil {
-	// 	log.Printf("borrow查询market_id失败: %v", borrowErr)
-	// 	return
-	// }
-	// if borrowRs.Next() {
-	// 	log.Printf("borrow-market_id查询1")
-	// 	upRs, upErr := con.Exec("update borrow set total_loan_amount=total_loan_amount+? where market_id=?", assets, market_id)
-	// 	if upErr != nil {
-	// 		log.Printf("borrow 更新失败: %v", upErr)
-	// 		return
-	// 	}
-	// 	upRow, _ := upRs.RowsAffected()
-	// 	log.Printf("borrow 更新条数: %v", upRow)
-	// }
+	if errR != nil {
+		log.Printf("borrow_assets_operation_record 新增失败: %v", errR)
+		defer con.Close()
+		return
+	}
+	dwLastInsertID, _ := resultR.LastInsertId()
+	log.Printf("borrow_assets_operation_record 新增id：=%v", dwLastInsertID)
 	defer con.Close() // 程序退出时关闭数据库连接
 }
 
@@ -482,7 +483,9 @@ func InsertBorrowSupplyDetaliCollateral(parsedJson map[string]interface{}, diges
 	}
 
 	sql := "insert into borrow_supply_detail(supply_type,market_id,caller_address,on_behalf_address,assets,digest,transaction_time_unix,transaction_time,collateral_token_type,loan_token_type) value(?,?,?,?,?,?,?,?,?,?)"
+	sqlOr := "insert into borrow_assets_operation_record(operation_type,market_id,caller,on_behalf,assets,digest,transaction_time_unix,transaction_time,collateral_token_type,loan_token_type) value(?,?,?,?,?,?,?,?,?,?)"
 	result, err := con.Exec(sql, 2, market_id, caller_address, on_behalf_address, assets, digest, transactionTimeUnix, transactionTime, collateralType, loanType)
+	resultOr, errOr := con.Exec(sqlOr, "Collateral", market_id, caller_address, on_behalf_address, assets, digest, transactionTimeUnix, transactionTime, collateralType, loanType)
 	if err != nil {
 		log.Printf("borrow_supply_detail_collateral新增失败: %v", err)
 		defer con.Close()
@@ -490,21 +493,13 @@ func InsertBorrowSupplyDetaliCollateral(parsedJson map[string]interface{}, diges
 	}
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("borrow_supply_detail_collateral新增id：=%v", lastInsertID)
-
-	// borrowRs, borrowErr := con.Query("select * from borrow where market_id=?", market_id)
-	// if borrowErr != nil {
-	// 	log.Printf("borrow查询market_id失败: %v", borrowErr)
-	// 	return
-	// }
-	// if borrowRs.Next() {
-	// 	upRs, upErr := con.Exec("update borrow set total_supply_collateral_amount=total_supply_collateral_amount+? where market_id=?", assets, market_id)
-	// 	if upErr != nil {
-	// 		log.Printf("borrow 更新失败: %v", upErr)
-	// 		return
-	// 	}
-	// 	upRow, _ := upRs.RowsAffected()
-	// 	log.Printf("borrow 更新条数: %v", upRow)
-	// }
+	if errOr != nil {
+		log.Printf("borrow_assets_operation_record 新增失败: %v", errOr)
+		defer con.Close()
+		return
+	}
+	orLastInsertID, _ := resultOr.LastInsertId()
+	log.Printf("borrow_assets_operation_record 新增id：=%v", orLastInsertID)
 	defer con.Close() // 程序退出时关闭数据库连接
 }
 
@@ -537,7 +532,7 @@ func InsertBorrowSupplyDetali(parsedJson map[string]interface{}, digest string, 
 	}
 
 	sql := "insert into borrow_supply_detail(supply_type,market_id,caller_address,on_behalf_address,assets,shares,digest,transaction_time_unix,transaction_time,collateral_token_type,loan_token_type) value(?,?,?,?,?,?,?,?,?,?,?)"
-	sqlDw := "insert into borrow_assets_supply_withdraw(operation_type,market_id,caller,on_behalf,assets,shares,digest,transaction_time_unix,transaction_time,collateral_token_type,loan_token_type) value(?,?,?,?,?,?,?,?,?,?,?)"
+	sqlDw := "insert into borrow_assets_operation_record(operation_type,market_id,caller,on_behalf,assets,shares,digest,transaction_time_unix,transaction_time,collateral_token_type,loan_token_type) value(?,?,?,?,?,?,?,?,?,?,?)"
 	result, err := con.Exec(sql, 1, market_id, caller_address, on_behalf_address, assets, shares, digest, transactionTimeUnix, transactionTime, collateralType, loanType)
 	resultDw, errDw := con.Exec(sqlDw, "Deposit", market_id, caller_address, on_behalf_address, assets, shares, digest, transactionTimeUnix, transactionTime, collateralType, loanType)
 	if err != nil {
@@ -549,12 +544,12 @@ func InsertBorrowSupplyDetali(parsedJson map[string]interface{}, digest string, 
 	log.Printf("borrow_supply_detail 新增id：=%v", lastInsertID)
 
 	if errDw != nil {
-		log.Printf("borrow_assets_supply_withdraw 新增失败: %v", errDw)
+		log.Printf("borrow_assets_operation_record 新增失败: %v", errDw)
 		defer con.Close()
 		return
 	}
 	dwLastInsertID, _ := resultDw.LastInsertId()
-	log.Printf("borrow_assets_supply_withdraw新增id：=%v", dwLastInsertID)
+	log.Printf("borrow_assets_operation_record 新增id：=%v", dwLastInsertID)
 	defer con.Close() // 程序退出时关闭数据库连接
 }
 

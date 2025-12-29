@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	ScheduledTaskTypeBorrow = 1
-	ScheduledTaskTypeVault  = 2
+	ScheduledTaskTypeBorrow  = 1
+	ScheduledTaskTypeVault   = 2
+	ScheduledTaskTypeFarming = 3
 )
 
 func RpcRequestScanCreateVault() {
