@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"haedal-earn-borrow-server/common"
 	"haedal-earn-borrow-server/jobs/borrow/logic"
 
 	"github.com/robfig/cron/v3"
@@ -20,10 +21,13 @@ func startEventJob() {
 	// 添加定时任务（每 10 秒执行一次）
 	_, err := c.AddFunc("*/10 * * * * *", func() {
 		fmt.Println("event cron 任务执行：", time.Now().Format("15:04:05.000"))
-		nextCursor := logic.QueryEventsCursor()
-		logic.RpcApiRequest(nextCursor)
+		borrowNextCursor := common.QueryEventsCursor(common.ScheduledTaskTypeBorrow)
+		// farmingNextCursor := common.QueryEventsCursor(common.ScheduledTaskTypeFarming)
+		logic.RpcApiRequest(borrowNextCursor)
 		logic.RpcRequestScanCreateVault()
 		logic.ScanVaultEvent()
+		// logic.RpcRequestScanCreateFarming(farmingNextCursor)
+		// logic.ScanFarmingEvent()
 	})
 	if err != nil {
 		fmt.Println("event添加任务失败：", err)

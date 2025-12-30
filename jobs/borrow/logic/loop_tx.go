@@ -2,13 +2,14 @@ package logic
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"strconv"
 	"time"
 
 	"haedal-earn-borrow-server/common"
+	"haedal-earn-borrow-server/common/mydb"
+	"haedal-earn-borrow-server/common/rpcSdk"
 
 	"github.com/block-vision/sui-go-sdk/models"
 	"github.com/block-vision/sui-go-sdk/sui"
@@ -24,13 +25,10 @@ const (
 	// PackageId         = "0xa192fea008b04b3627a125c7774de1364a5b4d4e59345f6602be21a5adfc920a" // 12-23 11:25
 	// HEarnObjectId     = "0xa4e27805c7bc0587a7907cb20fad95a1925bab4fca022d3337510812d368f0f1"
 	// OracleObjectId    = "0x83095db301ef05c51a5868806be87feb530b1ca333652f8adb61cdfbb3c8dceb"
-	PackageId         = "0xfedd869c200a819d4d8a440b29a082dbf227fd773fb4d88bf34df53435f005b4" // 12-29 15:13
-	HEarnObjectId     = "0xa86275de9aa81366d14599ee3fe65c1de9c716e85a917a0a5b2e2dfa8fd95d18"
-	OracleObjectId    = "0x155b1743460d76503bee9d7b3f1d686ebe3bcd572eeb200c257ddb8a8a4dc81d"
-	FarmingObjectId   = "0x035f5a1b09ea99927a2dd811742b10cd456be323200bc1fdda6e17bbfef65cf7"
-	SuiUserAddress    = "0x438796b44e606f8768c925534ebb87be9ded13cc51a6ddd955e6e40ab85db6f5"
-	SuiBlockvisionEnv = "https://sui-testnet-endpoint.blockvision.org"
-	SuiEnv            = "https://fullnode.testnet.sui.io:443"
+	PackageId       = "0x6c645f0061b6972dc256258c4c164efcbefad453b51c96acbc9f412c7b4b94f8" // 12-29 15:13
+	HEarnObjectId   = "0xf272773273920c52e42311f974b0db698fdb398d837cabb54dbcaa4068867f1f"
+	OracleObjectId  = "0x021e8bba9711dcf30f4bc5aa77cd85044b4b275bb64d4929ff1cb36b83787801"
+	FarmingObjectId = "0xdaf7535ceff38cdd4c651c76bc57718be9bc7b646c292aa9113441afc5d6b4dd"
 )
 
 const (
@@ -75,42 +73,42 @@ const (
 	RebalanceEvent               = "::meta_vault_events::RebalanceEvent"               // Vault池Rebalance
 )
 
-func SuiTransactionBlockParameter(nextCursor string) models.SuiXQueryTransactionBlocksRequest {
-	params := models.SuiXQueryTransactionBlocksRequest{
-		SuiTransactionBlockResponseQuery: models.SuiTransactionBlockResponseQuery{
-			TransactionFilter: models.TransactionFilter{
-				// "ChangedObject": HEarnObjectId,
-				"InputObject": HEarnObjectId,
-				// "MoveFunction": map[string]interface{}{
-				// 	"package": PackageId,
-				// 	"module":  "market_borrower_entry",
-				// },
-			},
-			Options: models.SuiTransactionBlockOptions{
-				ShowInput:   true,
-				ShowEffects: true,
-				ShowEvents:  true,
-			},
-		},
-		Limit:           50,
-		DescendingOrder: false,
-	}
-	if nextCursor != "" && nextCursor != "null" && nextCursor != "undefined" {
-		params.Cursor = nextCursor
-	}
-	return params
-}
+// func SuiTransactionBlockInputParameter(InputObjectId string, nextCursor string) models.SuiXQueryTransactionBlocksRequest {
+// 	params := models.SuiXQueryTransactionBlocksRequest{
+// 		SuiTransactionBlockResponseQuery: models.SuiTransactionBlockResponseQuery{
+// 			TransactionFilter: models.TransactionFilter{
+// 				// "ChangedObject": HEarnObjectId,
+// 				"InputObject": InputObjectId,
+// 				// "MoveFunction": map[string]interface{}{
+// 				// 	"package": PackageId,
+// 				// 	"module":  "market_borrower_entry",
+// 				// },
+// 			},
+// 			Options: models.SuiTransactionBlockOptions{
+// 				ShowInput:   true,
+// 				ShowEffects: true,
+// 				ShowEvents:  true,
+// 			},
+// 		},
+// 		Limit:           50,
+// 		DescendingOrder: false,
+// 	}
+// 	if nextCursor != "" && nextCursor != "null" && nextCursor != "undefined" {
+// 		params.Cursor = nextCursor
+// 	}
+// 	return params
+// }
 
 func RpcApiRequest(nextCursor string) {
 	log.Printf("SuiXQueryTransactionBlocks nextCursor=%v\n", nextCursor)
-	cli := sui.NewSuiClient(SuiBlockvisionEnv)
+	cli := sui.NewSuiClient(rpcSdk.SuiBlockvisionEnv)
 	ctx := context.Background()
-	resp, err := cli.SuiXQueryTransactionBlocks(ctx, SuiTransactionBlockParameter(nextCursor))
+	resp, err := cli.SuiXQueryTransactionBlocks(ctx, rpcSdk.SuiTransactionBlockInputParameter(HEarnObjectId, nextCursor))
 	if err != nil {
 		fmt.Printf("borrow RpcApiRequest err:%v\n", err)
 		return
 	}
-	EventsCursorUpdate(resp.NextCursor)
+	common.EventsCursorUpdate(resp.NextCursor, common.ScheduledTaskTypeBorrow)
 	if len(resp.Data) == 0 {
 		log.Printf("SuiXQueryTransactionBlocks lastCursor=%v\n", nextCursor)
 		return
@@ -158,7 +156,7 @@ func InsertBorrowRateUpdate(parsedJson map[string]interface{}, digest string, tr
 		log.Printf("转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(convRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from borrow_rate_update where digest=? and market_id=?", digest, market_id)
 	if queryErr != nil {
 		log.Printf("borrow_rate_update查询 digest失败: %v", queryErr)
@@ -181,36 +179,6 @@ func InsertBorrowRateUpdate(parsedJson map[string]interface{}, digest string, tr
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("borrow_rate_update新增id：=%v", lastInsertID)
 	defer con.Close() // 程序退出时关闭数据库连接
-}
-
-func EventsCursorUpdate(digest string) {
-	con := common.GetDbConnection()
-	sql := "update scheduled_task_record set digest=? where timing_type=1"
-	rs, err := con.Exec(sql, digest)
-	if err != nil {
-		log.Printf("scheduled_task_record update digest失败：%v\n", err)
-	}
-	updateRowCount, _ := rs.RowsAffected()
-	log.Printf("scheduled_task_record updateRowCount=:%d\n", updateRowCount)
-	defer con.Close()
-}
-
-func QueryEventsCursor() string {
-	// digest := ""
-	var digest sql.NullString
-	con := common.GetDbConnection()
-	sql := "select digest from scheduled_task_record where timing_type=1"
-	err := con.QueryRow(sql).Scan(&digest)
-	if err != nil {
-		log.Printf("QueryEventsCursor失败：%v\n", err)
-		defer con.Close()
-		return ""
-	}
-	defer con.Close()
-	if digest.Valid {
-		return digest.String
-	}
-	return ""
 }
 
 func GetTransactionFunctionName(transactions []interface{}) string {
@@ -237,7 +205,7 @@ func InsertRateDetali(parsedJson map[string]interface{}, transactions []interfac
 			log.Printf("转换失败：%v\n", convErr)
 		}
 		transactionTime := time.UnixMilli(convRs)
-		con := common.GetDbConnection()
+		con := mydb.GetDbConnection()
 		queryRs, queryErr := con.Query("select * from rate_detail where digest=? and market_id=?", digest, market_id)
 		if queryErr != nil {
 			log.Printf("borrow查询 digest失败: %v", queryErr)
@@ -277,7 +245,7 @@ func InsertBorroWithdraw(parsedJson map[string]interface{}, digest string, trans
 		log.Printf("转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(convRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from borrow_withdraw where digest=? and market_id=?", digest, market_id)
 	if queryErr != nil {
 		log.Printf("borrow_withdraw查询 digest失败: %v", queryErr)
@@ -324,7 +292,7 @@ func InsertBorroWithdrawCollateral(parsedJson map[string]interface{}, digest str
 		log.Printf("转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(convRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from borrow_withdraw_collateral where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("borrow查询 digest失败: %v", queryErr)
@@ -371,7 +339,7 @@ func InsertBorrowRepayDetali(parsedJson map[string]interface{}, digest string, t
 		log.Printf("转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(convRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from borrow_repay_detail where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("borrow查询 digest失败: %v", queryErr)
@@ -421,7 +389,7 @@ func InsertBorrowDetali(parsedJson map[string]interface{}, digest string, transa
 		log.Printf("转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(convRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from borrow_detail where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("borrow查询 digest失败: %v", queryErr)
@@ -463,7 +431,7 @@ func InsertBorrowSupplyDetaliCollateral(parsedJson map[string]interface{}, diges
 	assets := parsedJson["assets"].(string)
 	collateralType := parsedJson["collateral_token_type"].(map[string]interface{})["name"].(string)
 	loanType := parsedJson["loan_token_type"].(map[string]interface{})["name"].(string)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	convRs, convErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
 	if convErr != nil {
 		log.Printf("转换失败：%v\n", convErr)
@@ -516,7 +484,7 @@ func InsertBorrowSupplyDetali(parsedJson map[string]interface{}, digest string, 
 		log.Printf("转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(convRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	// tx, txErr := con.Begin()
 	queryRs, queryErr := con.Query("select * from borrow_supply_detail where digest=? and market_id=?", digest, market_id)
 	if queryErr != nil {
@@ -571,7 +539,7 @@ func InsertBorrow(parsedJson map[string]interface{}, digest string, transactionT
 
 	// log.Printf("title=%v", title)
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from borrow where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("borrow查询 digest失败: %v", queryErr)

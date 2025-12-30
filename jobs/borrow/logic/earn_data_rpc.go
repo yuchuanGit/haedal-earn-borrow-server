@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"haedal-earn-borrow-server/common/mydb"
+	"haedal-earn-borrow-server/common/rpcSdk"
 	"log"
 	"strconv"
 	"strings"
 	"time"
-
-	"haedal-earn-borrow-server/common"
 
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
 	"github.com/block-vision/sui-go-sdk/models"
@@ -27,11 +27,11 @@ func VaultAllLoopExecuteMove() {
 }
 
 func ExecuteMoveInsertVaultYieldEarned(vaultInfo VaultModel, failRetryCount int) {
-	cli := sui.NewSuiClient(SuiEnv)
+	cli := sui.NewSuiClient(rpcSdk.SuiEnv)
 	ctx := context.Background()
 	tx := transaction.NewTransaction()
 	tx.SetSuiClient(cli.(*sui.Client))
-	tx.SetSender(models.SuiAddress(SuiUserAddress))
+	tx.SetSender(models.SuiAddress(rpcSdk.SuiUserAddress))
 	arguments, parameErr := GetYieldEarnedParameter(cli, ctx, *tx, vaultInfo.VaultId)
 	if parameErr != nil {
 		ExecuteMoveUpdateVaultYieldEarnedFailRetry(vaultInfo, failRetryCount)
@@ -122,7 +122,7 @@ func ExecuteMoveUpdateVaultYieldEarnedFailRetry(vaultInfo VaultModel, failRetryC
 }
 
 func InsertVaultExchangeRate(vaultId string, asset_decimals float64, exchangeRate string) {
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sql := "insert into vault_exchange_rate(vault_id,exchange_rate,transaction_time) value(?,?,?)"
 	exchangeRateF, _ := strconv.ParseFloat(exchangeRate, 64)
 	// powResult := math.Pow(10, asset_decimals+6)
@@ -140,7 +140,7 @@ func InsertVaultExchangeRate(vaultId string, asset_decimals float64, exchangeRat
 
 func InsertVaultApy(vaultId string, exchangeRate string) {
 	var preApy VaultApyModel
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	querySql := "SELECT id,vault_id,exchange_rate,apy,transaction_time from vault_apy where  vault_id=? and transaction_time=(SELECT max(transaction_time) previousTime from vault_apy where vault_id=?)"
 	queryErr := con.QueryRow(querySql, vaultId, vaultId).Scan(&preApy.Id, &preApy.VaultId, &preApy.ExchangeRate, &preApy.Apy, &preApy.TransactionTime)
 	exchangeRateF, _ := strconv.ParseFloat(exchangeRate, 64)
@@ -225,7 +225,7 @@ func GetYieldEarnedParameter(cli sui.ISuiAPI, ctx context.Context, tx transactio
 
 func QueryVaultAll() []VaultModel {
 	var vms []VaultModel
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sql := "select vault_id,vault_name,asset_type,htoken_type,asset_decimals from vault "
 	rs, err := con.Query(sql)
 	if err != nil {

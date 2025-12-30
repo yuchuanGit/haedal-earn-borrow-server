@@ -1,4 +1,4 @@
-package common
+package mydb
 
 import (
 	"database/sql"
@@ -71,8 +71,8 @@ func InitConfig() error {
 	// 1. 获取配置文件绝对路径（避免相对路径问题）
 	// 项目根目录/conf/app.ini
 	confPath := filepath.Join(GetProjectRoot(), "conf", "app.ini") //pro环境
-	// confPath := filepath.Join(GetCurrentSourceDir()+"/../", "conf", "app.ini") //dev环境
-	fmt.Printf("加载配置文件：%s\n", confPath)
+	// confPath := filepath.Join(GetCurrentSourceDir()+"/../../", "conf", "app.ini") //dev环境
+	// fmt.Printf("加载配置文件：%s\n", confPath)
 
 	// 2. 检查配置文件是否存在
 	if _, err := os.Stat(confPath); os.IsNotExist(err) {

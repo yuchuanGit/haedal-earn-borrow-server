@@ -2,6 +2,8 @@ package logic
 
 import (
 	"haedal-earn-borrow-server/common"
+	"haedal-earn-borrow-server/common/mydb"
+	"haedal-earn-borrow-server/common/rpcSdk"
 	"log"
 	"strconv"
 	"time"
@@ -22,24 +24,15 @@ const (
 	FarmingMigrateEvent            = "::meta_vault_events::FarmingMigrateEvent"    //
 )
 
-func RpcRequestScanFarmingEvent(jobInfo ScheduledTaskRecord, isFinalTask bool) {
-	nextCursor := ""
-	if jobInfo.Digest != nil {
-		nextCursor = *jobInfo.Digest
-	}
-	reqParams := SuiTransactionBlockVaultEventParameter(jobInfo.InputObjectId, nextCursor)
-	resp := EventRpcRequest(reqParams)
-	EventsCursorUpdateById(resp.NextCursor, jobInfo.Id)
+func RpcRequestScanCreateFarming(nextCursor string) {
+	log.Printf("RpcRequestScanCreateFarming nextCursor=%v\n", nextCursor)
+	reqParams := rpcSdk.SuiTransactionBlockInputParameter(FarmingObjectId, nextCursor)
+	resp := rpcSdk.EventRpcRequest(reqParams, "ScanCreateFarming")
+	common.EventsCursorUpdate(resp.NextCursor, common.ScheduledTaskTypeFarming)
 	if len(resp.Data) == 0 {
-		log.Printf("RpcRequestScanVaultEvent lastCursor=%v\n", nextCursor)
-		if isFinalTask {
-			UpdateTimingTypeExecutionCompleted(false, ScheduledTaskTypeFarming, 0) // 更新所有Vault任务未执行
-		} else {
-			UpdateTimingTypeExecutionCompleted(true, ScheduledTaskTypeFarming, jobInfo.Id) // 更新所有Vault任务已完成执行
-		}
+		log.Printf("RpcRequestScanCreateFarming lastCursor=%v\n", nextCursor)
 		return
 	}
-
 	for _, data := range resp.Data {
 		digest := data.Digest
 		transactionTimeUnix := data.TimestampMs
@@ -48,6 +41,53 @@ func RpcRequestScanFarmingEvent(jobInfo ScheduledTaskRecord, isFinalTask bool) {
 			switch eventType {
 			case FarmingPoolCreateEvent: // 创建FarmingPool
 				InsertFarmingPoolCreate(event.ParsedJson, digest, transactionTimeUnix)
+			case FarmingRoleUpdateEvent: //角色权限更新
+				InsertFarmingRoleUpdate(event.ParsedJson, digest, transactionTimeUnix)
+			case FarmingMigrateEvent: //合约版本迁移
+				InsertFarmingMigrate(event.ParsedJson, digest, transactionTimeUnix)
+			}
+		}
+	}
+	RpcRequestScanCreateFarming(resp.NextCursor)
+}
+
+func ScanFarmingEvent() {
+	jobTasks := common.QueryExecutionInputObjectId(common.ScheduledTaskTypeFarmingPoolId, "ScanFarmingEvent")
+	isFinalTask := false
+	lastIdx := len(jobTasks) - 1
+	for idx, jobTask := range jobTasks {
+		if idx == lastIdx {
+			isFinalTask = true
+		}
+		RpcRequestScanFarmingEvent(jobTask, isFinalTask)
+	}
+}
+
+func RpcRequestScanFarmingEvent(jobInfo common.ScheduledTaskRecord, isFinalTask bool) {
+	nextCursor := ""
+	if jobInfo.Digest != nil {
+		nextCursor = *jobInfo.Digest
+	}
+	reqParams := rpcSdk.SuiTransactionBlockInputParameter(jobInfo.InputObjectId, nextCursor)
+	resp := rpcSdk.EventRpcRequest(reqParams, "ScanFarmingEvent")
+	common.EventsCursorUpdateById(resp.NextCursor, jobInfo.Id)
+	if len(resp.Data) == 0 {
+		log.Printf("RpcRequestScanFarmingEvent lastCursor=%v\n", nextCursor)
+		if isFinalTask {
+			common.UpdateTimingTypeExecutionCompleted(false, common.ScheduledTaskTypeFarmingPoolId, 0) // 更新所有Vault任务未执行
+		} else {
+			common.UpdateTimingTypeExecutionCompleted(true, common.ScheduledTaskTypeFarmingPoolId, jobInfo.Id) // 更新所有Vault任务已完成执行
+		}
+		return
+	}
+	for _, data := range resp.Data {
+		digest := data.Digest
+		transactionTimeUnix := data.TimestampMs
+		for _, event := range data.Events {
+			eventType := EventType(event.Type)
+			switch eventType {
+			// case FarmingPoolCreateEvent: // 创建FarmingPool
+			// 	InsertFarmingPoolCreate(event.ParsedJson, digest, transactionTimeUnix)
 			case FarmingRewardConfigAddEvent: //奖励配置新增
 				InsertFarmingRewardConfigAdd(event.ParsedJson, digest, transactionTimeUnix)
 			case FarmingRewardBankFundEvent: //奖励池充值
@@ -66,10 +106,10 @@ func RpcRequestScanFarmingEvent(jobInfo ScheduledTaskRecord, isFinalTask bool) {
 				InsertFarmingUnstake(event.ParsedJson, digest, transactionTimeUnix)
 			case FarmingClaimEvent: //奖励领取
 				InsertFarmingClaim(event.ParsedJson, digest, transactionTimeUnix)
-			case FarmingRoleUpdateEvent: //角色权限更新
-				InsertFarmingRoleUpdate(event.ParsedJson, digest, transactionTimeUnix)
-			case FarmingMigrateEvent: //合约版本迁移
-				InsertFarmingMigrate(event.ParsedJson, digest, transactionTimeUnix)
+				// case FarmingRoleUpdateEvent: //角色权限更新
+				// 	InsertFarmingRoleUpdate(event.ParsedJson, digest, transactionTimeUnix)
+				// case FarmingMigrateEvent: //合约版本迁移
+				// 	InsertFarmingMigrate(event.ParsedJson, digest, transactionTimeUnix)
 			}
 		}
 	}
@@ -96,7 +136,7 @@ func InsertFarmingPoolCreate(parsedJson map[string]interface{}, digest string, t
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from farming_pool_create where digest=? and pool_id=?", digest, pool_id)
 	if queryErr != nil {
 		log.Printf("farming_pool_create查询 digest失败: %v", queryErr)
@@ -119,6 +159,7 @@ func InsertFarmingPoolCreate(parsedJson map[string]interface{}, digest string, t
 	}
 	lastInsertID, _ := result.LastInsertId()
 	log.Printf("farming_pool_create新增id：=%v", lastInsertID)
+	common.InsertScheduledTask(con, common.ScheduledTaskTypeFarmingPoolId, pool_id, "InsertFarmingPoolCreate")
 	defer con.Close()
 }
 
@@ -143,15 +184,15 @@ func InsertFarmingRewardConfigAdd(parsedJson map[string]interface{}, digest stri
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 
-	con := common.GetDbConnection()
-	queryRs, queryErr := con.Query("select * from farming_reward_config_add where digest=? and pool_id=?", digest, pool_id)
+	con := mydb.GetDbConnection()
+	queryRs, queryErr := con.Query("select * from farming_reward_config_add where digest=? and pool_id=? and reward_token_type=?", digest, pool_id, reward_token_type)
 	if queryErr != nil {
-		log.Printf("farming_reward_config_add查询 digest失败: %v", queryErr)
+		log.Printf("farming_reward_config_add查询 digest+pool_id+reward_token_type失败: %v", queryErr)
 		defer con.Close()
 		return
 	}
 	if queryRs.Next() {
-		log.Printf("farming_reward_config_add digest+pool_id exist :%v,%v\n", digest, pool_id)
+		log.Printf("farming_reward_config_add digest+pool_id+reward_token_type exist :%v,%v,%v\n", digest, pool_id, reward_token_type)
 		defer queryRs.Close()
 		defer con.Close()
 		return
@@ -188,7 +229,7 @@ func InsertFarmingRewardBankFund(parsedJson map[string]interface{}, digest strin
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from farming_reward_bank_fund where digest=? and pool_id=?", digest, pool_id)
 	if queryErr != nil {
 		log.Printf("farming_reward_bank_fund查询 digest失败: %v", queryErr)
@@ -233,7 +274,7 @@ func InsertFarmingRewardBankExtract(parsedJson map[string]interface{}, digest st
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from farming_reward_bank_extract where digest=? and pool_id=?", digest, pool_id)
 	if queryErr != nil {
 		log.Printf("farming_reward_bank_extract查询 digest失败: %v", queryErr)
@@ -280,7 +321,7 @@ func InsertFarmingRewardConfigUpdate(parsedJson map[string]interface{}, digest s
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from farming_reward_config_update where digest=? and pool_id=?", digest, pool_id)
 	if queryErr != nil {
 		log.Printf("farming_reward_config_update查询 digest失败: %v", queryErr)
@@ -322,7 +363,7 @@ func InsertFarmingPoolPause(parsedJson map[string]interface{}, digest string, tr
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from farming_pool_pause where digest=? and pool_id=?", digest, pool_id)
 	if queryErr != nil {
 		log.Printf("farming_pool_pause查询 digest失败: %v", queryErr)
@@ -364,7 +405,7 @@ func InsertFarmingPoolResume(parsedJson map[string]interface{}, digest string, t
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from farming_pool_resume where digest=? and pool_id=?", digest, pool_id)
 	if queryErr != nil {
 		log.Printf("farming_pool_resume查询 digest失败: %v", queryErr)
@@ -408,7 +449,7 @@ func InsertFarmingStake(parsedJson map[string]interface{}, digest string, transa
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from farming_stake where digest=? and pool_id=?", digest, pool_id)
 	if queryErr != nil {
 		log.Printf("farming_stake查询 digest失败: %v", queryErr)
@@ -452,7 +493,7 @@ func InsertFarmingUnstake(parsedJson map[string]interface{}, digest string, tran
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from farming_unstake where digest=? and pool_id=?", digest, pool_id)
 	if queryErr != nil {
 		log.Printf("farming_unstake查询 digest失败: %v", queryErr)
@@ -496,7 +537,7 @@ func InsertFarmingClaim(parsedJson map[string]interface{}, digest string, transa
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from farming_claim where digest=? and pool_id=?", digest, pool_id)
 	if queryErr != nil {
 		log.Printf("farming_claim查询 digest失败: %v", queryErr)
@@ -540,7 +581,7 @@ func InsertFarmingRoleUpdate(parsedJson map[string]interface{}, digest string, t
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from farming_role_update where digest=? and caller=?", digest, caller)
 	if queryErr != nil {
 		log.Printf("farming_role_update查询 digest失败: %v", queryErr)
@@ -582,7 +623,7 @@ func InsertFarmingMigrate(parsedJson map[string]interface{}, digest string, tran
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from farming_migrate where digest=? and caller=?", digest, caller)
 	if queryErr != nil {
 		log.Printf("farming_migrate查询 digest失败: %v", queryErr)

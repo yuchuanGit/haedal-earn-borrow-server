@@ -6,13 +6,13 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"haedal-earn-borrow-server/common/mydb"
+	"haedal-earn-borrow-server/common/rpcSdk"
 	"log"
 	"math"
 	"math/big"
 	"strconv"
 	"strings"
-
-	"haedal-earn-borrow-server/common"
 
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
 	"github.com/block-vision/sui-go-sdk/models"
@@ -23,7 +23,7 @@ import (
 
 func InsertClearingUser() {
 	var loanUsers []LoanUserInfo
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sql := "SELECT loanUser.market_id,loanUser.caller_address, " +
 		"ccc.feed_id as collateralFeedId,ccc.feed_object_id as collateralFeedObjectId,ccl.feed_id as loanFeedId,ccl.feed_object_id as loanFeedObjectId " +
 		"from (SELECT market_id,caller_address,max(collateral_token_type) collateral_token_type, max(loan_token_type) loan_token_type from borrow_detail GROUP BY caller_address,market_id) loanUser " +
@@ -48,11 +48,11 @@ func InsertClearingUser() {
 		// feedIds[userInfo.LoanFeedId] = userInfo.LoanFeedId
 	}
 	if len(loanUsers) > 0 {
-		cli := sui.NewSuiClient(SuiEnv)
+		cli := sui.NewSuiClient(rpcSdk.SuiEnv)
 		ctx := context.Background()
 		tx := transaction.NewTransaction()
 		tx.SetSuiClient(cli.(*sui.Client))
-		tx.SetSender(models.SuiAddress(SuiUserAddress))
+		tx.SetSender(models.SuiAddress(rpcSdk.SuiUserAddress))
 		var clearingUsers []UserPositionInfo
 
 		// coinPrice := common.PythPrice(feedIds)
@@ -250,7 +250,7 @@ func userPositionInfoParameter(cli sui.ISuiAPI, ctx context.Context, tx transact
 }
 
 func UpdateMarketRate() {
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sql := "SELECT market_id from borrow where scheduled_execution=0"
 	rs, err := con.Query(sql)
 	if err != nil {
@@ -339,11 +339,11 @@ func UpdateBorrowRate(marketId uint64, con *sql.DB) {
 
 func GetMarketInfo(marketId uint64) []MarketInfo {
 	var initVal []MarketInfo
-	cli := sui.NewSuiClient(SuiEnv)
+	cli := sui.NewSuiClient(rpcSdk.SuiEnv)
 	ctx := context.Background()
 	tx := transaction.NewTransaction()
 	tx.SetSuiClient(cli.(*sui.Client))
-	tx.SetSender(models.SuiAddress(SuiUserAddress))
+	tx.SetSender(models.SuiAddress(rpcSdk.SuiUserAddress))
 	arguments, parameErr := GetMarketInfoParameter(cli, ctx, *tx, marketId)
 	if parameErr != nil {
 		return initVal
@@ -375,7 +375,7 @@ func DevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx transac
 	}
 
 	devRs, devErr := cli.SuiDevInspectTransactionBlock(ctx, models.SuiDevInspectTransactionBlockRequest{
-		Sender:  SuiUserAddress,
+		Sender:  rpcSdk.SuiUserAddress,
 		TxBytes: txBytes,
 	})
 	if devErr != nil {

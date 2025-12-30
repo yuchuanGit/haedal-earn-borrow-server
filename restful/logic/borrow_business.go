@@ -3,6 +3,7 @@ package logic
 import (
 	"fmt"
 	"haedal-earn-borrow-server/common"
+	"haedal-earn-borrow-server/common/mydb"
 	"log"
 	"math"
 	"sort"
@@ -125,7 +126,7 @@ type RateModelDetail struct {
 
 func QueryBorrowDetail(marketId string) (BorrowDetailVo, error) {
 	var vo BorrowDetailVo
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	borrowSql := "select total_supply_amount,total_supply_collateral_amount,total_loan_amount,collateral_token_type,loan_token_type,oracle_id,lltv,ltv,market_title,supply_rate,borrow_rate,liquidity from borrow where market_id=?"
 	err := con.QueryRow(borrowSql, marketId).Scan(
 		&vo.TotalSupplyAmount,
@@ -180,7 +181,7 @@ type SupplyBorrowGroup struct {
 func QueryBorrowDetailRateModel(marketId string) (RateModel, error) {
 	var vo RateModel
 	var ratesVo []RateModelDetail
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sql := "SELECT dateUnit,GROUP_CONCAT(interestRate) interestRate,GROUP_CONCAT(rate_type) rate_type from (" +
 		"SELECT DATE_FORMAT(rd.transaction_time,'%Y-%m-%d') as dateUnit,rd.borrow_rate/10000000000000000 interestRate,rate_type " +
 		"FROM rate_detail rd INNER JOIN (" +
@@ -302,7 +303,7 @@ type CoinField struct {
 
 func GetCoinMap() map[string]CoinField {
 	coinMap := make(map[string]CoinField)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sql := "select coin_type,feed_id,feed_object_id from coin_config"
 	rs, err := con.Query(sql)
 	if err != nil {
@@ -346,7 +347,7 @@ func QueryBorrowDetailRateLine(marketId string, timePeriodType int8, lineType in
 		dateFormat = "%m/%d"
 		start = end.AddDate(0, 0, -90)
 	}
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	condition := " and rate_type in('supply')"
 	if lineType == 2 {
 		condition = " and rate_type in('borrow','borrow_and_supply')"
@@ -394,7 +395,7 @@ func QueryBorrowDetailLine(marketId string, timePeriodType int8, lineType int8) 
 		start = end.AddDate(0, 0, -90)
 	}
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sql := ""
 	var args []any
 	args = append(args, dateFormat)
@@ -447,7 +448,7 @@ func YourTotalSupplyLine(userAddress string, timePeriodType int8) ([]BorrowLine,
 		isWeek = false
 	}
 	// end = end.AddDate(0, 0, -1)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sql := "SELECT userMarket.*,cc.coin_type,cc.feed_id from" +
 		"(SELECT DATE_FORMAT( max(transaction_time), '%Y-%m-%d %H:%i' ) AS transaction_time,DATE_FORMAT(transaction_time,?) AS dateUnit,sum( assets ) AS amount,market_id FROM borrow_supply_detail " +
 		"WHERE supply_type =? AND caller_address =? and transaction_time>=? and transaction_time<=? GROUP BY dateUnit,market_id) userMarket " +
@@ -800,7 +801,7 @@ func TotalCollateralBorrow(userAddress string) (TotalCollateralBorrowVo, error) 
 	totalSupplyUsd := 0.00
 	userTotalSupplyUsd := 0.00
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	// sql := "select b.total_supply_amount,b.total_supply_collateral_amount,b.total_loan_amount,b.collateral_token_type,b.loan_token_type,ccc.feed_id as collateral_feed_id,ccl.feed_id as loan_feed_id from borrow b" +
 	// 	"left join coin_config ccc on ccc.coin_type=b.collateral_token_type" +
 	// 	"left join coin_config ccl on ccl.coin_type=b.loan_token_type "
@@ -998,7 +999,7 @@ func BorrowSupplyDetailLine(isUser bool, userAddress string, marketId string, ti
 		start = end.AddDate(0, 0, -90)
 	}
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sql := ""
 	var args []any
 	args = append(args, dateFormat)
@@ -1038,7 +1039,7 @@ func BorrowSupplyDetailLine(isUser bool, userAddress string, marketId string, ti
 
 func QueryUserBorrowDetail(userAddress string, marketId string) (UserBorrowDetaliVo, error) {
 	var userBorrowDetali UserBorrowDetaliVo
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sql := "select supply_type,assets,shares from borrow_supply_detail where caller_address=? and market_id=?"
 	queryRs, queryErr := con.Query(sql, userAddress, marketId)
 	if queryErr != nil {
@@ -1073,7 +1074,7 @@ func QueryUserBorrowDetail(userAddress string, marketId string) (UserBorrowDetal
 
 func QueryBorrowVaultList() ([]BorrowModel, error) {
 	var borrows []BorrowModel
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select id,market_id,market_title,market_log,total_supply_amount,total_supply_collateral_amount,total_loan_amount,loan_token_type,collateral_token_type,fee,lltv,ltv,oracle_id,supply_rate,borrow_rate,liquidity,liquidity_proportion from borrow ")
 	if queryErr != nil {
 		log.Printf("QueryBorrowVaultList=11111%v\n", queryErr.Error())

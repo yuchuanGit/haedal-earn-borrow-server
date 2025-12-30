@@ -7,7 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"haedal-earn-borrow-server/common"
+	"haedal-earn-borrow-server/common/mydb"
+	"haedal-earn-borrow-server/common/rpcSdk"
 	"haedal-earn-borrow-server/jobs/borrow/logic"
 
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
@@ -28,11 +29,11 @@ func EarnTimedCollection() {
 }
 
 func EarnTvlTimedCollection(vaultInfo logic.VaultModel, transaction_time time.Time, failRetryCount int) {
-	cli := sui.NewSuiClient(logic.SuiEnv)
+	cli := sui.NewSuiClient(rpcSdk.SuiEnv)
 	ctx := context.Background()
 	tx := transaction.NewTransaction()
 	tx.SetSuiClient(cli.(*sui.Client))
-	tx.SetSender(models.SuiAddress(logic.SuiUserAddress))
+	tx.SetSender(models.SuiAddress(rpcSdk.SuiUserAddress))
 	arguments, parameErr := logic.GetYieldEarnedParameter(cli, ctx, *tx, vaultInfo.VaultId)
 	typeArguments, typeErr := logic.AssetAndHTokenEnumsType(vaultInfo)
 	if parameErr != nil {
@@ -76,7 +77,7 @@ func EarnTvlTimedCollectionFailRetry(vaultInfo logic.VaultModel, transaction_tim
 func InsertVaultYieldEarned(vaultInfo logic.VaultModel, tvl string, transaction_time time.Time) {
 	depositWithdrawAsset := 0.00
 	handlingFee := 0.00
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sqlDW := "SELECT (SELECT ifnull(sum(asset_amount),0) deposit_asset from vault_deposit where vault_id=?)" +
 		"-(SELECT ifnull(sum(asset_amount),0) withdraw_asset from vault_withdraw where vault_id=?) deposit_withdraw_asset"
 	sqlFee := "SELECT ifnull(sum(management_fee_assets),0)+ifnull(sum(performance_fee_assets),0) as handling_fee from vault_accrue_fees where vault_id=?"
@@ -111,7 +112,7 @@ func InsertVaultYieldEarned(vaultInfo logic.VaultModel, tvl string, transaction_
 }
 
 func InsertVaultTvl(vaultInfo logic.VaultModel, tvl string, transaction_time time.Time) {
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	transaction_time_unix := transaction_time.UnixMilli() // 毫秒
 	sql := "insert into vault_tvl_record(vault_id,total_asset,asset_type,asset_decimals,transaction_time_unix,transaction_time) value(?,?,?,?,?,?)"
 	result, err := con.Exec(sql, vaultInfo.VaultId, tvl, vaultInfo.AssetType, vaultInfo.AssetDecimals, transaction_time_unix, transaction_time)

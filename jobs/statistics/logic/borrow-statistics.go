@@ -6,7 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"haedal-earn-borrow-server/common"
+	"haedal-earn-borrow-server/common/mydb"
+	"haedal-earn-borrow-server/common/rpcSdk"
 	"haedal-earn-borrow-server/jobs/borrow/logic"
 
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
@@ -29,11 +30,11 @@ func MarketTimeCollection() {
 
 // borrow 借/还净值定时收集
 func BorrowTimeCollection(marketInfo MarketModel, transaction_time time.Time, failRetryCount int) {
-	cli := sui.NewSuiClient(logic.SuiEnv)
+	cli := sui.NewSuiClient(rpcSdk.SuiEnv)
 	ctx := context.Background()
 	tx := transaction.NewTransaction()
 	tx.SetSuiClient(cli.(*sui.Client))
-	tx.SetSender(models.SuiAddress(logic.SuiUserAddress))
+	tx.SetSender(models.SuiAddress(rpcSdk.SuiUserAddress))
 	marketId, err := strconv.ParseUint(marketInfo.MarketId, 10, 64)
 	if err != nil {
 		log.Printf("BorrowTimeCollection marketId转换失败：%v\n", err)
@@ -67,11 +68,11 @@ func BorrowTimeCollection(marketInfo MarketModel, transaction_time time.Time, fa
 
 // borrow 池存/取净值定时收集
 func BorrowSupplyTimeCollection(marketInfo MarketModel, transaction_time time.Time, failRetryCount int) {
-	cli := sui.NewSuiClient(logic.SuiEnv)
+	cli := sui.NewSuiClient(rpcSdk.SuiEnv)
 	ctx := context.Background()
 	tx := transaction.NewTransaction()
 	tx.SetSuiClient(cli.(*sui.Client))
-	tx.SetSender(models.SuiAddress(logic.SuiUserAddress))
+	tx.SetSender(models.SuiAddress(rpcSdk.SuiUserAddress))
 	marketId, err := strconv.ParseUint(marketInfo.MarketId, 10, 64)
 	if err != nil {
 		log.Printf("borrowSupplyCollection marketId转换失败：%v\n", err)
@@ -104,7 +105,7 @@ func BorrowSupplyTimeCollection(marketInfo MarketModel, transaction_time time.Ti
 }
 
 func InsertBorrowSupplyAssetsRecord(marketInfo MarketModel, transaction_time time.Time, supplyAssets string) {
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	transaction_time_unix := transaction_time.UnixMilli() // 毫秒
 	sql := "insert into borrow_supply_assets_record(market_id,total_asset,collateral_token_type,base_token_decimals,loan_token_type,quote_token_decimals,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?)"
 	result, err := con.Exec(sql, marketInfo.MarketId, supplyAssets, marketInfo.CollateralTokenType, marketInfo.CollateralCoinDecimals, marketInfo.LoanTokenType, marketInfo.LoanCoinDecimals, transaction_time_unix, transaction_time)
@@ -119,7 +120,7 @@ func InsertBorrowSupplyAssetsRecord(marketInfo MarketModel, transaction_time tim
 }
 
 func InsertBorrowAssetsRecord(marketInfo MarketModel, transaction_time time.Time, supplyAssets string) {
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	transaction_time_unix := transaction_time.UnixMilli() // 毫秒
 	sql := "insert into borrow_assets_record(market_id,total_asset,collateral_token_type,base_token_decimals,loan_token_type,quote_token_decimals,transaction_time_unix,transaction_time) value(?,?,?,?,?,?,?,?)"
 	result, err := con.Exec(sql, marketInfo.MarketId, supplyAssets, marketInfo.CollateralTokenType, marketInfo.CollateralCoinDecimals, marketInfo.LoanTokenType, marketInfo.LoanCoinDecimals, transaction_time_unix, transaction_time)
@@ -171,7 +172,7 @@ func HearnAndMarketIdParameter(cli sui.ISuiAPI, ctx context.Context, tx transact
 func QueryBorrowAll() []MarketModel {
 	var markets []MarketModel
 	sql := "SELECT id,market_id,market_title,collateral_token_type,loan_token_type,base_token_decimals,quote_token_decimals from borrow"
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	rs, err := con.Query(sql)
 	if err != nil {
 		log.Printf("QueryBorrowAll 查询失败: %v", err)

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"haedal-earn-borrow-server/common"
+	"haedal-earn-borrow-server/common/mydb"
+	"haedal-earn-borrow-server/common/rpcSdk"
 
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
 	"github.com/block-vision/sui-go-sdk/models"
@@ -19,15 +21,9 @@ import (
 	"github.com/block-vision/sui-go-sdk/utils"
 )
 
-const (
-	ScheduledTaskTypeBorrow  = 1
-	ScheduledTaskTypeVault   = 2
-	ScheduledTaskTypeFarming = 3
-)
-
 func RpcRequestScanCreateVault() {
 	reqParams := SuiTransactionBlockCreateVaultParameter()
-	resp := EventRpcRequest(reqParams)
+	resp := rpcSdk.EventRpcRequest(reqParams, "ScanCreateVault")
 	for _, data := range resp.Data {
 		digest := data.Digest
 		transactionTime := data.TimestampMs
@@ -64,11 +60,11 @@ func SuiTransactionBlockCreateVaultParameter() models.SuiXQueryTransactionBlocks
 }
 
 func ExecuteMoveUpdateVaultTotalAsset(vaultId string) {
-	cli := sui.NewSuiClient(SuiEnv)
+	cli := sui.NewSuiClient(rpcSdk.SuiEnv)
 	ctx := context.Background()
 	tx := transaction.NewTransaction()
 	tx.SetSuiClient(cli.(*sui.Client))
-	tx.SetSender(models.SuiAddress(SuiUserAddress))
+	tx.SetSender(models.SuiAddress(rpcSdk.SuiUserAddress))
 	arguments, parameErr := GetTotalAssetsParameter(cli, ctx, *tx, vaultId)
 	if parameErr != nil {
 		return
@@ -120,7 +116,7 @@ func ExecuteMoveUpdateVaultTotalAsset(vaultId string) {
 
 func QueryVaultByVaultId(vaultId string) VaultModel {
 	var vm VaultModel
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sql := "select vault_name,asset_type,htoken_type from vault where vault_id=?"
 	err := con.QueryRow(sql, vaultId).Scan(&vm.VaultName, &vm.AssetType, &vm.HtokenType)
 	if err != nil {
@@ -133,7 +129,7 @@ func QueryVaultByVaultId(vaultId string) VaultModel {
 }
 
 func UpdateVaultTotalAsset(totalAsset string, vaultId string) {
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sql := "update vault set total_asset=? where vault_id=?"
 	result, err := con.Exec(sql, totalAsset, vaultId)
 	if err != nil {
@@ -163,7 +159,7 @@ func ExecuteDevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx 
 	}
 
 	devRs, devErr := cli.SuiDevInspectTransactionBlock(ctx, models.SuiDevInspectTransactionBlockRequest{
-		Sender:  SuiUserAddress,
+		Sender:  rpcSdk.SuiUserAddress,
 		TxBytes: txBytes,
 	})
 	if devErr != nil {
@@ -241,7 +237,7 @@ type VaultModel struct {
 }
 
 func QueryVaultInfoUpdate(vaultId string) {
-	cli := sui.NewSuiClient(SuiEnv)
+	cli := sui.NewSuiClient(rpcSdk.SuiEnv)
 	ctx := context.Background()
 	reqParams := models.SuiGetObjectRequest{
 		ObjectId: vaultId,
@@ -291,7 +287,7 @@ func QueryVaultInfoUpdate(vaultId string) {
 }
 
 func VaultInfoUpdate(vm VaultModel) {
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	sql := "update vault set vault_name=?,asset_decimals=?,total_shares=?,asset_reserve=?,supply_cap=?,max_deposit=?,min_deposit=?,management_fee_bps=?,performance_fee_bps=? where vault_id=?"
 	result, err := con.Exec(sql, vm.VaultName, vm.AssetDecimals, vm.TotalShares, vm.AssetReserve, vm.SupplyCap, vm.MaxDeposit, vm.MinDeposit, vm.ManagementFeeBps, vm.PerformanceFeeBps, vm.VaultId)
 	if err != nil {
@@ -305,7 +301,7 @@ func VaultInfoUpdate(vm VaultModel) {
 }
 
 func ScanVaultEvent() {
-	jobTasks := QueryVaultExecutionInputObjectId()
+	jobTasks := common.QueryExecutionInputObjectId(common.ScheduledTaskTypeVault, "ScanVaultEvent")
 	isFinalTask := false
 	lastIdx := len(jobTasks) - 1
 	for idx, jobTask := range jobTasks {
@@ -328,20 +324,20 @@ func ScanVaultEvent() {
 	// }
 }
 
-func RpcRequestScanVaultEvent(jobInfo ScheduledTaskRecord, isFinalTask bool) {
+func RpcRequestScanVaultEvent(jobInfo common.ScheduledTaskRecord, isFinalTask bool) {
 	nextCursor := ""
 	if jobInfo.Digest != nil {
 		nextCursor = *jobInfo.Digest
 	}
-	reqParams := SuiTransactionBlockVaultEventParameter(jobInfo.InputObjectId, nextCursor)
-	resp := EventRpcRequest(reqParams)
-	EventsCursorUpdateById(resp.NextCursor, jobInfo.Id)
+	reqParams := rpcSdk.SuiTransactionBlockInputParameter(jobInfo.InputObjectId, nextCursor)
+	resp := rpcSdk.EventRpcRequest(reqParams, "ScanVaultEvent")
+	common.EventsCursorUpdateById(resp.NextCursor, jobInfo.Id)
 	if len(resp.Data) == 0 {
 		log.Printf("RpcRequestScanVaultEvent lastCursor=%v\n", nextCursor)
 		if isFinalTask {
-			UpdateTimingTypeExecutionCompleted(false, ScheduledTaskTypeVault, 0) // 更新所有Vault任务未执行
+			common.UpdateTimingTypeExecutionCompleted(false, common.ScheduledTaskTypeVault, 0) // 更新所有Vault任务未执行
 		} else {
-			UpdateTimingTypeExecutionCompleted(true, ScheduledTaskTypeVault, jobInfo.Id) // 更新所有Vault任务已完成执行
+			common.UpdateTimingTypeExecutionCompleted(true, common.ScheduledTaskTypeVault, jobInfo.Id) // 更新所有Vault任务已完成执行
 		}
 		return
 	}
@@ -415,99 +411,38 @@ func RpcRequestScanVaultEvent(jobInfo ScheduledTaskRecord, isFinalTask bool) {
 	RpcRequestScanVaultEvent(jobInfo, isFinalTask)
 }
 
-func SuiTransactionBlockVaultEventParameter(vaultObjectId string, nextCursor string) models.SuiXQueryTransactionBlocksRequest {
-	params := models.SuiXQueryTransactionBlocksRequest{
-		SuiTransactionBlockResponseQuery: models.SuiTransactionBlockResponseQuery{
-			TransactionFilter: models.TransactionFilter{
-				"InputObject": vaultObjectId,
-			},
-			Options: models.SuiTransactionBlockOptions{
-				ShowInput:   true,
-				ShowEffects: true,
-				ShowEvents:  true,
-			},
-		},
-		Limit:           50,
-		DescendingOrder: false,
-	}
-	if nextCursor != "" && nextCursor != "null" && nextCursor != "undefined" {
-		params.Cursor = nextCursor
-	}
-	return params
-}
+// func SuiTransactionBlockVaultEventParameter(vaultObjectId string, nextCursor string) models.SuiXQueryTransactionBlocksRequest {
+// 	params := models.SuiXQueryTransactionBlocksRequest{
+// 		SuiTransactionBlockResponseQuery: models.SuiTransactionBlockResponseQuery{
+// 			TransactionFilter: models.TransactionFilter{
+// 				"InputObject": vaultObjectId,
+// 			},
+// 			Options: models.SuiTransactionBlockOptions{
+// 				ShowInput:   true,
+// 				ShowEffects: true,
+// 				ShowEvents:  true,
+// 			},
+// 		},
+// 		Limit:           50,
+// 		DescendingOrder: false,
+// 	}
+// 	if nextCursor != "" && nextCursor != "null" && nextCursor != "undefined" {
+// 		params.Cursor = nextCursor
+// 	}
+// 	return params
+// }
 
-func UpdateTimingTypeExecutionCompleted(executionCompleted bool, timingType int, id int) {
-	con := common.GetDbConnection()
-	sql := "update scheduled_task_record set execution_completed=? where timing_type=?"
-	var params []any
-	params = append(params, executionCompleted)
-	params = append(params, timingType)
-	if executionCompleted {
-		sql = sql + " and id=?"
-		params = append(params, id)
-	}
-	_, upErr := con.Exec(sql, params...)
-	if upErr != nil {
-		fmt.Printf("UpdateTimingTypeExecutionCompleted scheduled_task_record execution_completed=0失败：%v\n", upErr.Error())
-	}
-	defer con.Close()
-}
-
-func EventsCursorUpdateById(digest string, id int) {
-	if digest == "" || digest == "null" || digest == "undefined" {
-		return
-	}
-	con := common.GetDbConnection()
-	sql := "update scheduled_task_record set digest=? where id=?"
-	rs, err := con.Exec(sql, digest, id)
-	if err != nil {
-		log.Printf("scheduled_task_record update digest失败：%v\n", err)
-	}
-	updateRowCount, _ := rs.RowsAffected()
-	log.Printf("scheduled_task_record updateRowCount=:%d\n", updateRowCount)
-	defer con.Close()
-}
-
-func QueryVaultExecutionInputObjectId() []ScheduledTaskRecord {
-	var jobTasks []ScheduledTaskRecord
-	con := common.GetDbConnection()
-	// sql := "SELECT id,digest,input_object_id from scheduled_task_record where timing_type=? and execution_completed=?"
-	// rs, err := con.Query(sql, ScheduledTaskTypeVault, false)
-	sql := "SELECT id,digest,input_object_id from scheduled_task_record where timing_type=?"
-	rs, err := con.Query(sql, ScheduledTaskTypeVault)
-	if err != nil {
-		fmt.Printf("QueryVaultExecutionInputObjectId 查询borrow失败：%v\n", err.Error())
-		defer con.Close()
-		return jobTasks
-	}
-	for rs.Next() {
-		var tr ScheduledTaskRecord
-		rs.Scan(&tr.Id, &tr.Digest, &tr.InputObjectId)
-		jobTasks = append(jobTasks, tr)
-	}
-	defer con.Close()
-	return jobTasks
-}
-
-type ScheduledTaskRecord struct {
-	Id                 int
-	TimingType         string  // 定时类型 1 borrow事件扫描 2.vault事件扫描'
-	Digest             *string // 下一次扫描事件游标
-	InputObjectId      string  // 扫描交易合约函数入参id
-	ExecutionCompleted bool    // 扫描是否完成 0 为完成 1 完成
-}
-
-func EventRpcRequest(req models.SuiXQueryTransactionBlocksRequest) models.SuiXQueryTransactionBlocksResponse {
-	var response models.SuiXQueryTransactionBlocksResponse
-	cli := sui.NewSuiClient(SuiBlockvisionEnv)
-	ctx := context.Background()
-	resp, err := cli.SuiXQueryTransactionBlocks(ctx, req)
-	if err != nil {
-		fmt.Printf("RpcApiRequest err:%v\n", err)
-		return response
-	}
-	return resp
-}
+// func EventRpcRequest(req models.SuiXQueryTransactionBlocksRequest) models.SuiXQueryTransactionBlocksResponse {
+// 	var response models.SuiXQueryTransactionBlocksResponse
+// 	cli := sui.NewSuiClient(SuiBlockvisionEnv)
+// 	ctx := context.Background()
+// 	resp, err := cli.SuiXQueryTransactionBlocks(ctx, req)
+// 	if err != nil {
+// 		fmt.Printf("RpcApiRequest err:%v\n", err)
+// 		return response
+// 	}
+// 	return resp
+// }
 
 func EventType(typeStr string) string {
 	resultType := ""
@@ -523,7 +458,7 @@ func EventType(typeStr string) string {
 }
 
 func getCoinMetaInfo(coinType string) (*models.CoinMetadataResponse, error) {
-	cli := sui.NewSuiClient(SuiEnv)
+	cli := sui.NewSuiClient(rpcSdk.SuiEnv)
 	ctx := context.Background()
 	rsp, err := cli.SuiXGetCoinMetadata(ctx, models.SuiXGetCoinMetadataRequest{CoinType: coinType})
 	if err != nil {
@@ -554,7 +489,7 @@ func InsertVault(parsedJson map[string]interface{}, digest string, transactionTi
 		log.Printf("转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(convRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault查询 digest失败: %v", queryErr)
@@ -585,7 +520,6 @@ func InsertVault(parsedJson map[string]interface{}, digest string, transactionTi
 		return
 	}
 	if taskRs.Next() {
-		log.Printf("1111111=%v", isInsertTask)
 		isInsertTask = false
 	}
 	if isInsertTask {
@@ -620,7 +554,7 @@ func InsertVaultRebalance(parsedJson map[string]interface{}, digest string, tran
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_rebalance where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_rebalance查询 digest失败: %v", queryErr)
@@ -668,7 +602,7 @@ func InsertVaultAccrueFees(parsedJson map[string]interface{}, digest string, tra
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_accrue_fees where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_accrue_fees查询 digest失败: %v", queryErr)
@@ -712,7 +646,7 @@ func InsertVaultCompensateLostAssets(parsedJson map[string]interface{}, digest s
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_compensate_lost_assets where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_compensate_lost_assets查询 digest失败: %v", queryErr)
@@ -756,7 +690,7 @@ func InsertVaultSetName(parsedJson map[string]interface{}, digest string, transa
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_set_name where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_set_name查询 digest失败: %v", queryErr)
@@ -801,7 +735,7 @@ func InsertVaultWithdraw(parsedJson map[string]interface{}, digest string, trans
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_withdraw where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_withdraw查询 digest失败: %v", queryErr)
@@ -855,7 +789,7 @@ func InsertVaultDeposit(parsedJson map[string]interface{}, digest string, transa
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_deposit where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_deposit查询 digest失败: %v", queryErr)
@@ -912,7 +846,7 @@ func InsertVaultSubmitmentFee(parsedJson map[string]interface{}, digest string, 
 			log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 		}
 		transactionTime := time.UnixMilli(ttConvRs)
-		con := common.GetDbConnection()
+		con := mydb.GetDbConnection()
 		queryRs, queryErr := con.Query("select * from vault_submit_management_fee where digest=? and vault_id=?", digest, vaultId)
 		if queryErr != nil {
 			log.Printf("vault_submit_management_fee查询 digest+vault_id失败: %v", queryErr)
@@ -961,7 +895,7 @@ func InsertVaultSubmitPerformanceFee(parsedJson map[string]interface{}, digest s
 			log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 		}
 		transactionTime := time.UnixMilli(ttConvRs)
-		con := common.GetDbConnection()
+		con := mydb.GetDbConnection()
 		queryRs, queryErr := con.Query("select * from vault_submit_performance_fee where digest=? and vault_id=?", digest, vaultId)
 		if queryErr != nil {
 			log.Printf("vault_submit_performance_fee查询 digest+vault_id失败: %v", queryErr)
@@ -1003,7 +937,7 @@ func InsertVaultApplyManagementFee(parsedJson map[string]interface{}, digest str
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_apply_management_fee where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_apply_management_fee查询 digest失败: %v", queryErr)
@@ -1044,7 +978,7 @@ func InsertVaultApplyPerformanceFee(parsedJson map[string]interface{}, digest st
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_apply_performance_fee where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_apply_performance_fee查询 digest失败: %v", queryErr)
@@ -1086,7 +1020,7 @@ func InsertVaultSetFeeRecipient(parsedJson map[string]interface{}, digest string
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_set_fee_recipient where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_set_fee_recipient查询 digest失败: %v", queryErr)
@@ -1127,7 +1061,7 @@ func InsertVaultUpdateLastRebalance(parsedJson map[string]interface{}, digest st
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_updatelast_rebalance where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_updatelast_rebalance查询 digest失败: %v", queryErr)
@@ -1168,7 +1102,7 @@ func InsertVaultSetMinRebalanceInterval(parsedJson map[string]interface{}, diges
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_set_min_rebalance_interval where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_set_min_rebalance_interval查询 digest失败: %v", queryErr)
@@ -1209,7 +1143,7 @@ func InsertVaultSetWithdrawCooldown(parsedJson map[string]interface{}, digest st
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_set_withdraw_cooldown where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_set_withdraw_cooldown查询 digest失败: %v", queryErr)
@@ -1250,7 +1184,7 @@ func InsertVaultSetMaxDeposit(parsedJson map[string]interface{}, digest string, 
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_set_max_deposit where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_set_max_deposit查询 digest失败: %v", queryErr)
@@ -1291,7 +1225,7 @@ func InsertVaultSetMinDeposit(parsedJson map[string]interface{}, digest string, 
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_set_min_deposit where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_set_min_deposit查询 digest失败: %v", queryErr)
@@ -1339,7 +1273,7 @@ func InsertVaultSubmitSupplyCap(parsedJson map[string]interface{}, digest string
 			log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 		}
 		transactionTime := time.UnixMilli(ttConvRs)
-		con := common.GetDbConnection()
+		con := mydb.GetDbConnection()
 		queryRs, queryErr := con.Query("select * from vault_submit_supply_cap where digest=? and vault_id=?", digest, vaultId)
 		if queryErr != nil {
 			log.Printf("vault_submit_supply_cap查询 digest+vault_id失败: %v", queryErr)
@@ -1381,7 +1315,7 @@ func InsertVaultApplySupplyCap(parsedJson map[string]interface{}, digest string,
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_apply_supply_cap where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_apply_supply_cap查询 digest失败: %v", queryErr)
@@ -1424,7 +1358,7 @@ func InsertVaultSubmitMarketRemoval(parsedJson map[string]interface{}, digest st
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_submit_market_removal where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_submit_market_removal查询 digest失败: %v", queryErr)
@@ -1466,7 +1400,7 @@ func InsertVaultRemoveMarket(parsedJson map[string]interface{}, digest string, t
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_remove_market where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_remove_market查询 digest失败: %v", queryErr)
@@ -1507,7 +1441,7 @@ func InsertVaultRevokePending(parsedJson map[string]interface{}, digest string, 
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_revoke_pending where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_revoke_pending查询 digest失败: %v", queryErr)
@@ -1549,7 +1483,7 @@ func InsertVaultSetGuardian(parsedJson map[string]interface{}, digest string, tr
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_set_guardian_record where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_set_guardian_record查询 digest+vaultId失败: %v", queryErr)
@@ -1601,7 +1535,7 @@ func InsertVaultSubmitTimeLock(parsedJson map[string]interface{}, digest string,
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_submit_time_lock where digest=?", digest)
 	if queryErr != nil {
 		log.Printf("vault_submit_time_lock查询 digest失败: %v", queryErr)
@@ -1643,7 +1577,7 @@ func InsertVaultSetAllocatorRecord(parsedJson map[string]interface{}, digest str
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_set_allocator_record where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_set_allocator_record查询 digest+vaultId失败: %v", queryErr)
@@ -1694,7 +1628,7 @@ func InsertVaultSetOwnerRecord(parsedJson map[string]interface{}, digest string,
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_set_owner_record where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_set_owner_record查询 digest+vaultId失败: %v", queryErr)
@@ -1746,7 +1680,7 @@ func InsertVaultSetCuratorRecord(parsedJson map[string]interface{}, digest strin
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_set_curator_record where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_set_curator_record查询 digest+vaultId失败: %v", queryErr)
@@ -1803,7 +1737,7 @@ func InsertWithdrawSupplyQueue(parsedJson map[string]interface{}, digest string,
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_withdraw_queue where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_withdraw_queue查询 digest失败: %v", queryErr)
@@ -1849,7 +1783,7 @@ func InsertVaultSupplyQueue(parsedJson map[string]interface{}, digest string, tr
 		log.Printf("transactionTimeUnix转换失败：%v\n", convErr)
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_supply_queue where digest=? and vault_id=?", digest, vaultId)
 	if queryErr != nil {
 		log.Printf("vault_supply_queue查询 digest失败: %v", queryErr)
@@ -1893,7 +1827,7 @@ func SetAllocationCap(parsedJson map[string]interface{}, digest string, transact
 	}
 	transactionTime := time.UnixMilli(ttConvRs)
 
-	con := common.GetDbConnection()
+	con := mydb.GetDbConnection()
 	queryRs, queryErr := con.Query("select * from vault_set_allocation_cap where digest=? and market_id=?", digest, marketId)
 	if queryErr != nil {
 		log.Printf("vault_set_allocation_cap查询 digest失败: %v", queryErr)
