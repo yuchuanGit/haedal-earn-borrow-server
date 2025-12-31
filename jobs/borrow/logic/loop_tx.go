@@ -25,10 +25,10 @@ const (
 	// PackageId         = "0xa192fea008b04b3627a125c7774de1364a5b4d4e59345f6602be21a5adfc920a" // 12-23 11:25
 	// HEarnObjectId     = "0xa4e27805c7bc0587a7907cb20fad95a1925bab4fca022d3337510812d368f0f1"
 	// OracleObjectId    = "0x83095db301ef05c51a5868806be87feb530b1ca333652f8adb61cdfbb3c8dceb"
-	PackageId       = "0x6c645f0061b6972dc256258c4c164efcbefad453b51c96acbc9f412c7b4b94f8" // 12-29 15:13
-	HEarnObjectId   = "0xf272773273920c52e42311f974b0db698fdb398d837cabb54dbcaa4068867f1f"
-	OracleObjectId  = "0x021e8bba9711dcf30f4bc5aa77cd85044b4b275bb64d4929ff1cb36b83787801"
-	FarmingObjectId = "0xdaf7535ceff38cdd4c651c76bc57718be9bc7b646c292aa9113441afc5d6b4dd"
+	PackageId       = "0x6674e6da8ca13907d0850c603ccf72a1b5a871c88cacc74716e6712ad19622fb" // 12-29 15:13
+	HEarnObjectId   = "0x9983f652c6d8c429fc168c4783818aa39c6094cd2a1eb642ada38b42bc617b76"
+	OracleObjectId  = "0x2a50bdf645ad98f65dca648431b6adeed700ad38a17c5c0a6ede709fab84e661"
+	FarmingObjectId = "0x2fe8e51aef2aa431c9c34febf51b25fb26568b78698dff3f3563dc75ff5e4852"
 )
 
 const (
