@@ -16,19 +16,15 @@ import (
 )
 
 const (
-	// PackageId         = "0x3bb6c9ecec37aa47a6b7cc40ddfb014004d6495f6733243e34482838ea956a0e" //12-17 20:47
-	// HEarnObjectId     = "0xa125076a0bc69578e7e9f60ba4a96b742604e02f1c3fc2f8994e9a3b37183bba"
-	// OracleObjectId    = "0x78f30de7d853e3245f82eafe639c149316e989bb6a33e5b6346c577475f04bf3"
-	// PackageId         = "0x74640585be1b236885fe461c18f9a31aedd78cf9444d6af4e63b065940e41cdc" // 12-19 11:15
-	// HEarnObjectId     = "0x0a1be2504d6e5a23fea45692558baf0b2f68166448c6f70d80148979c0b10dbb"
-	// OracleObjectId    = "0xc745cc48a1e67312e5cc637d9c54a85065a5b718d16a13afb3fbf025b0aed918"
-	// PackageId         = "0xa192fea008b04b3627a125c7774de1364a5b4d4e59345f6602be21a5adfc920a" // 12-23 11:25
-	// HEarnObjectId     = "0xa4e27805c7bc0587a7907cb20fad95a1925bab4fca022d3337510812d368f0f1"
-	// OracleObjectId    = "0x83095db301ef05c51a5868806be87feb530b1ca333652f8adb61cdfbb3c8dceb"
-	PackageId       = "0x6674e6da8ca13907d0850c603ccf72a1b5a871c88cacc74716e6712ad19622fb" // 12-29 15:13
-	HEarnObjectId   = "0x9983f652c6d8c429fc168c4783818aa39c6094cd2a1eb642ada38b42bc617b76"
-	OracleObjectId  = "0x2a50bdf645ad98f65dca648431b6adeed700ad38a17c5c0a6ede709fab84e661"
-	FarmingObjectId = "0x2fe8e51aef2aa431c9c34febf51b25fb26568b78698dff3f3563dc75ff5e4852"
+// PackageId         = "0x3bb6c9ecec37aa47a6b7cc40ddfb014004d6495f6733243e34482838ea956a0e" //12-17 20:47
+// HEarnObjectId     = "0xa125076a0bc69578e7e9f60ba4a96b742604e02f1c3fc2f8994e9a3b37183bba"
+// OracleObjectId    = "0x78f30de7d853e3245f82eafe639c149316e989bb6a33e5b6346c577475f04bf3"
+// PackageId         = "0x74640585be1b236885fe461c18f9a31aedd78cf9444d6af4e63b065940e41cdc" // 12-19 11:15
+// HEarnObjectId     = "0x0a1be2504d6e5a23fea45692558baf0b2f68166448c6f70d80148979c0b10dbb"
+// OracleObjectId    = "0xc745cc48a1e67312e5cc637d9c54a85065a5b718d16a13afb3fbf025b0aed918"
+// PackageId         = "0xa192fea008b04b3627a125c7774de1364a5b4d4e59345f6602be21a5adfc920a" // 12-23 11:25
+// HEarnObjectId     = "0xa4e27805c7bc0587a7907cb20fad95a1925bab4fca022d3337510812d368f0f1"
+// OracleObjectId    = "0x83095db301ef05c51a5868806be87feb530b1ca333652f8adb61cdfbb3c8dceb"
 )
 
 const (
@@ -103,7 +99,7 @@ func RpcApiRequest(nextCursor string) {
 	log.Printf("SuiXQueryTransactionBlocks nextCursor=%v\n", nextCursor)
 	cli := sui.NewSuiClient(rpcSdk.SuiBlockvisionEnv)
 	ctx := context.Background()
-	resp, err := cli.SuiXQueryTransactionBlocks(ctx, rpcSdk.SuiTransactionBlockInputParameter(HEarnObjectId, nextCursor))
+	resp, err := cli.SuiXQueryTransactionBlocks(ctx, rpcSdk.SuiTransactionBlockInputParameter(rpcSdk.HEarnObjectId, nextCursor))
 	if err != nil {
 		fmt.Printf("borrow RpcApiRequest err:%v\n", err)
 		return

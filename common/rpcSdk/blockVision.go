@@ -11,7 +11,11 @@ import (
 )
 
 const (
-	SuiUserAddress = "0x438796b44e606f8768c925534ebb87be9ded13cc51a6ddd955e6e40ab85db6f5"
+	PackageId       = "0x6674e6da8ca13907d0850c603ccf72a1b5a871c88cacc74716e6712ad19622fb" // 12-29 15:13
+	HEarnObjectId   = "0x9983f652c6d8c429fc168c4783818aa39c6094cd2a1eb642ada38b42bc617b76"
+	OracleObjectId  = "0x2a50bdf645ad98f65dca648431b6adeed700ad38a17c5c0a6ede709fab84e661"
+	FarmingObjectId = "0x2fe8e51aef2aa431c9c34febf51b25fb26568b78698dff3f3563dc75ff5e4852"
+	SuiUserAddress  = "0x438796b44e606f8768c925534ebb87be9ded13cc51a6ddd955e6e40ab85db6f5"
 	// SuiUserAddress    = "0xec731dad64e781caff49561ed2a69e873b0c1977f923786b0b803c2386dfd19a"
 	SuiBlockvisionEnv = "https://sui-testnet-endpoint.blockvision.org"
 	SuiEnv            = "https://fullnode.testnet.sui.io:443"

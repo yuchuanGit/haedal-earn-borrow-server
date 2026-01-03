@@ -149,7 +149,7 @@ func BorrowCollectionFailRetry(marketInfo MarketModel, transaction_time time.Tim
 }
 
 func HearnAndMarketIdParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, marketId uint64) ([]transaction.Argument, error) {
-	hearnSharedObject, err := logic.GetSharedObjectRef(ctx, cli, logic.HEarnObjectId, true)
+	hearnSharedObject, err := logic.GetSharedObjectRef(ctx, cli, rpcSdk.HEarnObjectId, true)
 	if err != nil {
 		log.Printf("hearnSharedObject fail:%v", err.Error())
 		return nil, err

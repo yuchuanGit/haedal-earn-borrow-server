@@ -43,7 +43,7 @@ func SuiTransactionBlockCreateVaultParameter() models.SuiXQueryTransactionBlocks
 		SuiTransactionBlockResponseQuery: models.SuiTransactionBlockResponseQuery{
 			TransactionFilter: models.TransactionFilter{
 				"MoveFunction": map[string]interface{}{
-					"package":  PackageId,
+					"package":  rpcSdk.PackageId,
 					"module":   "meta_vault_entry",
 					"function": "create",
 				},
@@ -145,7 +145,7 @@ func UpdateVaultTotalAsset(totalAsset string, vaultId string) {
 
 func ExecuteDevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, moduleName string, funcName string, typeArguments []transaction.TypeTag, arguments []transaction.Argument) []moveCallResult {
 	tx.MoveCall(
-		models.SuiAddress(PackageId),
+		models.SuiAddress(rpcSdk.PackageId),
 		moduleName,
 		funcName,
 		typeArguments,
@@ -187,9 +187,9 @@ func ExecuteDevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx 
 
 func GetTotalAssetsParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, vaultObjectId string) ([]transaction.Argument, error) {
 	valutSharedObject, err := GetSharedObjectRef(ctx, cli, vaultObjectId, true)
-	hearnSharedObject, err2 := GetSharedObjectRef(ctx, cli, HEarnObjectId, true)
+	hearnSharedObject, err2 := GetSharedObjectRef(ctx, cli, rpcSdk.HEarnObjectId, true)
 	log.Printf("vaultObjectId=%v\n", vaultObjectId)
-	log.Printf("HEarnObjectId=%v\n", HEarnObjectId)
+	log.Printf("HEarnObjectId=%v\n", rpcSdk.HEarnObjectId)
 	if err != nil {
 		log.Printf("valutSharedObject fail:%v", err.Error())
 		return nil, err

@@ -191,7 +191,7 @@ type VaultApyModel struct {
 
 func GetYieldEarnedParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, vaultObjectId string) ([]transaction.Argument, error) {
 	valutSharedObject, err := GetSharedObjectRef(ctx, cli, vaultObjectId, true)
-	hearnSharedObject, err2 := GetSharedObjectRef(ctx, cli, HEarnObjectId, true)
+	hearnSharedObject, err2 := GetSharedObjectRef(ctx, cli, rpcSdk.HEarnObjectId, true)
 	if err != nil {
 		log.Printf("valutSharedObject fail:%v", err.Error())
 		return nil, err

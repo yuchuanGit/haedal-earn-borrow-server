@@ -175,8 +175,8 @@ func (u *UserPositionInfo) UnmarshalBCS(d *bcs.Deserializer) error {
 func userPositionInfoParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction,
 	userInfo LoanUserInfo,
 ) ([]transaction.Argument, error) {
-	hearnSharedObject, err := GetSharedObjectRef(ctx, cli, HEarnObjectId, true)
-	oracleSharedObject, err4 := GetSharedObjectRef(ctx, cli, OracleObjectId, true)
+	hearnSharedObject, err := GetSharedObjectRef(ctx, cli, rpcSdk.HEarnObjectId, true)
+	oracleSharedObject, err4 := GetSharedObjectRef(ctx, cli, rpcSdk.OracleObjectId, true)
 	suppplyCollateralFeedSharedObject, err5 := GetSharedObjectRef(ctx, cli, userInfo.CollateralFeedObjectId, true)
 	loanFeedSharedObject, err6 := GetSharedObjectRef(ctx, cli, userInfo.LoanFeedObjectId, true)
 	clockSharedObject, err7 := GetSharedObjectRef(ctx, cli, "0x6", true)
@@ -360,7 +360,7 @@ type moveCallResult struct {
 func DevInspectTransactionBlock(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, moduleName string, funcName string, arguments []transaction.Argument) []MarketInfo {
 	var initVal []MarketInfo
 	tx.MoveCall(
-		models.SuiAddress(PackageId),
+		models.SuiAddress(rpcSdk.PackageId),
 		moduleName,
 		funcName,
 		[]transaction.TypeTag{},
@@ -473,7 +473,7 @@ type MarketInfo struct {
 // 实现 bcs.Marshaler 接口（可选，默认通过反射）
 
 func GetMarketInfoParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, marketId uint64) ([]transaction.Argument, error) {
-	hearnSharedObject, err := GetSharedObjectRef(ctx, cli, HEarnObjectId, true)
+	hearnSharedObject, err := GetSharedObjectRef(ctx, cli, rpcSdk.HEarnObjectId, true)
 	clockSharedObject, err2 := GetSharedObjectRef(ctx, cli, "0x6", true)
 	// marketID := uint64(2)
 	// marketIDs := []uint64{1, 2}

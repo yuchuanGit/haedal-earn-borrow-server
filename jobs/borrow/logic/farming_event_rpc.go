@@ -50,7 +50,7 @@ func RpcRequestReallocate(vaultInfo vault.VaultModel) {
 	// assetType := "0xd64cc91b92edbc31ac3867d6ba3b86f21a7a421b07f0a6113e14e3727498841c::usdc::USDC"
 	// htokenType := "0x7d8e1e07f20a79e2c6d3b9b578cffd8d333a1dc12154db73397db87a264be769::husdc::HUSDC"
 
-	arguments := []interface{}{vaultInfo.VaultId, HEarnObjectId, "0x6"}
+	arguments := []interface{}{vaultInfo.VaultId, rpcSdk.HEarnObjectId, "0x6"}
 	typeArguments := []interface{}{"0x" + vaultInfo.AssetType, "0x" + vaultInfo.HtokenType}
 	moduleName := "public_allocator"
 	funcName := "reallocate"
@@ -110,7 +110,7 @@ func RpcRequestReallocateeDevInspect() {
 
 func GetReallocateParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, vaultObjectId string) ([]transaction.Argument, error) {
 	valutSharedObject, err := GetSharedObjectRef(ctx, cli, vaultObjectId, true)
-	hearnSharedObject, err2 := GetSharedObjectRef(ctx, cli, HEarnObjectId, true)
+	hearnSharedObject, err2 := GetSharedObjectRef(ctx, cli, rpcSdk.HEarnObjectId, true)
 	clockSharedObject, err3 := GetSharedObjectRef(ctx, cli, "0x6", true)
 	if err != nil {
 		log.Printf("valutSharedObject fail:%v", err.Error())
@@ -155,7 +155,7 @@ func GetReallocateParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction
 
 func RpcRequestScanCreateFarming(nextCursor string) {
 	log.Printf("RpcRequestScanCreateFarming nextCursor=%v\n", nextCursor)
-	reqParams := rpcSdk.SuiTransactionBlockInputParameter(FarmingObjectId, nextCursor)
+	reqParams := rpcSdk.SuiTransactionBlockInputParameter(rpcSdk.FarmingObjectId, nextCursor)
 	resp := rpcSdk.EventRpcRequest(reqParams, "ScanCreateFarming")
 	common.EventsCursorUpdate(resp.NextCursor, common.ScheduledTaskTypeFarming)
 	if len(resp.Data) == 0 {
