@@ -1,12 +1,20 @@
 package logic
 
 import (
+	"context"
 	"haedal-earn-borrow-server/common"
 	"haedal-earn-borrow-server/common/mydb"
 	"haedal-earn-borrow-server/common/rpcSdk"
+	"haedal-earn-borrow-server/common/vault"
 	"log"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/block-vision/sui-go-sdk/models"
+	"github.com/block-vision/sui-go-sdk/sui"
+	"github.com/block-vision/sui-go-sdk/transaction"
+	"github.com/block-vision/sui-go-sdk/utils"
 )
 
 const (
@@ -23,6 +31,127 @@ const (
 	FarmingRoleUpdateEvent         = "::meta_vault_events::FarmingRoleUpdateEvent" //
 	FarmingMigrateEvent            = "::meta_vault_events::FarmingMigrateEvent"    //
 )
+
+func VaultReallocate() {
+	vaultInfos := vault.QueryVaultAll()
+	if len(vaultInfos) > 0 {
+		transaction_time := time.Now()
+		transaction_time = transaction_time.Add(-5 * time.Second) //当前时间5秒前
+		for _, vaultInfo := range vaultInfos {
+			RpcRequestReallocate(vaultInfo)
+		}
+	}
+}
+
+func RpcRequestReallocate(vaultInfo vault.VaultModel) {
+	cli := sui.NewSuiClient(rpcSdk.SuiEnv)
+	ctx := context.Background()
+	// vaultId := "0xbddef2d79691f0f6333dbf944bb3706ca62dd7ce9d1dc2fad71b0c88545f06aa"
+	// assetType := "0xd64cc91b92edbc31ac3867d6ba3b86f21a7a421b07f0a6113e14e3727498841c::usdc::USDC"
+	// htokenType := "0x7d8e1e07f20a79e2c6d3b9b578cffd8d333a1dc12154db73397db87a264be769::husdc::HUSDC"
+
+	arguments := []interface{}{vaultInfo.VaultId, HEarnObjectId, "0x6"}
+	typeArguments := []interface{}{"0x" + vaultInfo.AssetType, "0x" + vaultInfo.HtokenType}
+	moduleName := "public_allocator"
+	funcName := "reallocate"
+	moveCallReturn := rpcSdk.ExecuteSignAndExecuteTransactionBlock(cli, ctx, moduleName, funcName, typeArguments, arguments)
+	if len(moveCallReturn) > 0 {
+		utils.PrettyPrint(moveCallReturn)
+	}
+}
+
+func RpcRequestReallocateeDevInspect() {
+	cli := sui.NewSuiClient(rpcSdk.SuiEnv)
+	ctx := context.Background()
+	tx := transaction.NewTransaction()
+	tx.SetSuiClient(cli.(*sui.Client))
+	// tx.SetSender(models.SuiAddress("0xec731dad64e781caff49561ed2a69e873b0c1977f923786b0b803c2386dfd19a"))
+	vaultId := "0xbddef2d79691f0f6333dbf944bb3706ca62dd7ce9d1dc2fad71b0c88545f06aa"
+	arguments, parameErr := GetReallocateParameter(cli, ctx, *tx, vaultId)
+	if parameErr != nil {
+		return
+	}
+	assetType := "d64cc91b92edbc31ac3867d6ba3b86f21a7a421b07f0a6113e14e3727498841c::usdc::USDC"
+	htokenType := "7d8e1e07f20a79e2c6d3b9b578cffd8d333a1dc12154db73397db87a264be769::husdc::HUSDC"
+	assetParts := strings.Split(assetType, "::")
+	if len(assetParts) < 3 {
+		log.Printf("invalid vault AssetType type string: %v\n", assetType)
+		return
+	}
+	htokenParts := strings.Split(htokenType, "::")
+	if len(htokenParts) < 3 {
+		log.Printf("invalid vault HtokenType type string: %v\n", htokenType)
+		return
+	}
+	assetAddressBytes, _ := transaction.ConvertSuiAddressStringToBytes(models.SuiAddress(assetParts[0]))
+	hTokenAddressBytes, _ := transaction.ConvertSuiAddressStringToBytes(models.SuiAddress(htokenParts[0]))
+
+	typeArguments := []transaction.TypeTag{{
+		Struct: &transaction.StructTag{
+			Address: *assetAddressBytes,
+			Module:  assetParts[1],
+			Name:    assetParts[2],
+		},
+	}, {
+		Struct: &transaction.StructTag{
+			Address: *hTokenAddressBytes,
+			Module:  htokenParts[1],
+			Name:    htokenParts[2],
+		},
+	}}
+
+	moduleName := "public_allocator"
+	funcName := "reallocate"
+	moveCallReturn := ExecuteDevInspectTransactionBlock(cli, ctx, *tx, moduleName, funcName, typeArguments, arguments)
+	if len(moveCallReturn) > 0 {
+		utils.PrettyPrint(moveCallReturn)
+	}
+}
+
+func GetReallocateParameter(cli sui.ISuiAPI, ctx context.Context, tx transaction.Transaction, vaultObjectId string) ([]transaction.Argument, error) {
+	valutSharedObject, err := GetSharedObjectRef(ctx, cli, vaultObjectId, true)
+	hearnSharedObject, err2 := GetSharedObjectRef(ctx, cli, HEarnObjectId, true)
+	clockSharedObject, err3 := GetSharedObjectRef(ctx, cli, "0x6", true)
+	if err != nil {
+		log.Printf("valutSharedObject fail:%v", err.Error())
+		return nil, err
+	}
+	if err2 != nil {
+		log.Printf("hearnSharedObject fail:%v", err2.Error())
+		return nil, err2
+	}
+	if err3 != nil {
+		log.Printf("clockSharedObject fail:%v", err3.Error())
+		return nil, err2
+	}
+
+	arguments := []transaction.Argument{
+		// 第一个参数：&Vault<Asset, HToken> 对象
+		tx.Object(
+			transaction.CallArg{
+				Object: &transaction.ObjectArg{
+					SharedObject: valutSharedObject,
+				},
+			},
+		),
+		// 第二个参数：&Hear 对象
+		tx.Object(
+			transaction.CallArg{
+				Object: &transaction.ObjectArg{
+					SharedObject: hearnSharedObject,
+				},
+			},
+		),
+		tx.Object(
+			transaction.CallArg{
+				Object: &transaction.ObjectArg{
+					SharedObject: clockSharedObject,
+				},
+			},
+		),
+	}
+	return arguments, err
+}
 
 func RpcRequestScanCreateFarming(nextCursor string) {
 	log.Printf("RpcRequestScanCreateFarming nextCursor=%v\n", nextCursor)

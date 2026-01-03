@@ -19,6 +19,7 @@ func startJob() {
 	_, err := c.AddFunc("0 0 */1 * * *", func() {
 		fmt.Println("collect-every-hour cron 任务执行：", time.Now().Format("15:04:05.000"))
 		logic.VaultAllLoopExecuteMove()
+		// logic.VaultReallocate()
 	})
 	if err != nil {
 		fmt.Println("event添加任务失败：", err)

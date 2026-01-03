@@ -9,6 +9,7 @@ import (
 
 	"haedal-earn-borrow-server/common/mydb"
 	"haedal-earn-borrow-server/common/rpcSdk"
+	"haedal-earn-borrow-server/common/vault"
 	"haedal-earn-borrow-server/jobs/borrow/logic"
 
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
@@ -18,7 +19,7 @@ import (
 )
 
 func EarnTimedCollection() {
-	vaultInfos := logic.QueryVaultAll()
+	vaultInfos := vault.QueryVaultAll()
 	if len(vaultInfos) > 0 {
 		transaction_time := time.Now()
 		transaction_time = transaction_time.Add(-5 * time.Second) //当前时间5秒前
@@ -28,7 +29,7 @@ func EarnTimedCollection() {
 	}
 }
 
-func EarnTvlTimedCollection(vaultInfo logic.VaultModel, transaction_time time.Time, failRetryCount int) {
+func EarnTvlTimedCollection(vaultInfo vault.VaultModel, transaction_time time.Time, failRetryCount int) {
 	cli := sui.NewSuiClient(rpcSdk.SuiEnv)
 	ctx := context.Background()
 	tx := transaction.NewTransaction()
@@ -67,14 +68,14 @@ func EarnTvlTimedCollection(vaultInfo logic.VaultModel, transaction_time time.Ti
 	}
 }
 
-func EarnTvlTimedCollectionFailRetry(vaultInfo logic.VaultModel, transaction_time time.Time, failRetryCount int) {
+func EarnTvlTimedCollectionFailRetry(vaultInfo vault.VaultModel, transaction_time time.Time, failRetryCount int) {
 	if failRetryCount > 0 {
 		failRetryCount = failRetryCount - 1
 		EarnTvlTimedCollection(vaultInfo, transaction_time, failRetryCount)
 	}
 }
 
-func InsertVaultYieldEarned(vaultInfo logic.VaultModel, tvl string, transaction_time time.Time) {
+func InsertVaultYieldEarned(vaultInfo vault.VaultModel, tvl string, transaction_time time.Time) {
 	depositWithdrawAsset := 0.00
 	handlingFee := 0.00
 	con := mydb.GetDbConnection()
@@ -111,7 +112,7 @@ func InsertVaultYieldEarned(vaultInfo logic.VaultModel, tvl string, transaction_
 	defer con.Close()
 }
 
-func InsertVaultTvl(vaultInfo logic.VaultModel, tvl string, transaction_time time.Time) {
+func InsertVaultTvl(vaultInfo vault.VaultModel, tvl string, transaction_time time.Time) {
 	con := mydb.GetDbConnection()
 	transaction_time_unix := transaction_time.UnixMilli() // 毫秒
 	sql := "insert into vault_tvl_record(vault_id,total_asset,asset_type,asset_decimals,transaction_time_unix,transaction_time) value(?,?,?,?,?,?)"

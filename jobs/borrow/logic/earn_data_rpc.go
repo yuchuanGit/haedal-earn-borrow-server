@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"haedal-earn-borrow-server/common/mydb"
 	"haedal-earn-borrow-server/common/rpcSdk"
+	"haedal-earn-borrow-server/common/vault"
 	"log"
 	"strconv"
 	"strings"
@@ -18,7 +19,7 @@ import (
 )
 
 func VaultAllLoopExecuteMove() {
-	vaultInfos := QueryVaultAll()
+	vaultInfos := vault.QueryVaultAll()
 	if len(vaultInfos) > 0 {
 		for _, vaultInfo := range vaultInfos {
 			ExecuteMoveInsertVaultYieldEarned(vaultInfo, 2)
@@ -26,7 +27,7 @@ func VaultAllLoopExecuteMove() {
 	}
 }
 
-func ExecuteMoveInsertVaultYieldEarned(vaultInfo VaultModel, failRetryCount int) {
+func ExecuteMoveInsertVaultYieldEarned(vaultInfo vault.VaultModel, failRetryCount int) {
 	cli := sui.NewSuiClient(rpcSdk.SuiEnv)
 	ctx := context.Background()
 	tx := transaction.NewTransaction()
@@ -84,7 +85,7 @@ func ExecuteMoveInsertVaultYieldEarned(vaultInfo VaultModel, failRetryCount int)
 	}
 }
 
-func AssetAndHTokenEnumsType(vaultInfo VaultModel) ([]transaction.TypeTag, error) {
+func AssetAndHTokenEnumsType(vaultInfo vault.VaultModel) ([]transaction.TypeTag, error) {
 	assetParts := strings.Split(vaultInfo.AssetType, "::")
 	if len(assetParts) < 3 {
 		// log.Printf("invalid vault AssetType type string: %v\n", vaultInfo.AssetType)
@@ -114,7 +115,7 @@ func AssetAndHTokenEnumsType(vaultInfo VaultModel) ([]transaction.TypeTag, error
 	return typeArguments, nil
 }
 
-func ExecuteMoveUpdateVaultYieldEarnedFailRetry(vaultInfo VaultModel, failRetryCount int) {
+func ExecuteMoveUpdateVaultYieldEarnedFailRetry(vaultInfo vault.VaultModel, failRetryCount int) {
 	if failRetryCount > 0 {
 		failRetryCount = failRetryCount - 1
 		ExecuteMoveInsertVaultYieldEarned(vaultInfo, failRetryCount)
@@ -221,28 +222,4 @@ func GetYieldEarnedParameter(cli sui.ISuiAPI, ctx context.Context, tx transactio
 		),
 	}
 	return arguments, err
-}
-
-func QueryVaultAll() []VaultModel {
-	var vms []VaultModel
-	con := mydb.GetDbConnection()
-	sql := "select vault_id,vault_name,asset_type,htoken_type,asset_decimals from vault "
-	rs, err := con.Query(sql)
-	if err != nil {
-		log.Printf("QueryVaultAll 查询失败: %v", err)
-		defer con.Close()
-		return vms
-	}
-	for rs.Next() {
-		var vm VaultModel
-		errScan := rs.Scan(&vm.VaultId, &vm.VaultName, &vm.AssetType, &vm.HtokenType, &vm.AssetDecimals)
-		if errScan != nil {
-			log.Printf("QueryVaultAll scan失败: %v", err)
-			defer con.Close()
-			return vms
-		}
-		vms = append(vms, vm)
-	}
-	defer con.Close()
-	return vms
 }

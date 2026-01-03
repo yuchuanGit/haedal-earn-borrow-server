@@ -12,6 +12,7 @@ import (
 	"haedal-earn-borrow-server/common"
 	"haedal-earn-borrow-server/common/mydb"
 	"haedal-earn-borrow-server/common/rpcSdk"
+	"haedal-earn-borrow-server/common/vault"
 
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
 	"github.com/block-vision/sui-go-sdk/models"
@@ -114,8 +115,8 @@ func ExecuteMoveUpdateVaultTotalAsset(vaultId string) {
 	}
 }
 
-func QueryVaultByVaultId(vaultId string) VaultModel {
-	var vm VaultModel
+func QueryVaultByVaultId(vaultId string) vault.VaultModel {
+	var vm vault.VaultModel
 	con := mydb.GetDbConnection()
 	sql := "select vault_name,asset_type,htoken_type from vault where vault_id=?"
 	err := con.QueryRow(sql, vaultId).Scan(&vm.VaultName, &vm.AssetType, &vm.HtokenType)
@@ -221,21 +222,6 @@ func GetTotalAssetsParameter(cli sui.ISuiAPI, ctx context.Context, tx transactio
 	return arguments, err
 }
 
-type VaultModel struct {
-	VaultId           string
-	VaultName         *string
-	AssetType         string
-	HtokenType        string
-	AssetDecimals     float64 // 存入精度
-	TotalShares       string  // 存入总的份额
-	AssetReserve      string  // 总的闲置数量
-	SupplyCap         string  // Vault 最大存入数量
-	MaxDeposit        string  // Vault 单次最大存入数量
-	MinDeposit        string  // Vault 单次最小存入数量
-	ManagementFeeBps  string
-	PerformanceFeeBps string
-}
-
 func QueryVaultInfoUpdate(vaultId string) {
 	cli := sui.NewSuiClient(rpcSdk.SuiEnv)
 	ctx := context.Background()
@@ -253,7 +239,7 @@ func QueryVaultInfoUpdate(vaultId string) {
 	}
 	if resp.Data != nil {
 		if resp.Data.Content != nil {
-			var vm VaultModel
+			var vm vault.VaultModel
 			vm.VaultId = vaultId
 			fields := resp.Data.Content.Fields
 			vault_name, _ := fields["vault_name"].(string)
@@ -286,7 +272,7 @@ func QueryVaultInfoUpdate(vaultId string) {
 	// res.Data.Content.Fields
 }
 
-func VaultInfoUpdate(vm VaultModel) {
+func VaultInfoUpdate(vm vault.VaultModel) {
 	con := mydb.GetDbConnection()
 	sql := "update vault set vault_name=?,asset_decimals=?,total_shares=?,asset_reserve=?,supply_cap=?,max_deposit=?,min_deposit=?,management_fee_bps=?,performance_fee_bps=? where vault_id=?"
 	result, err := con.Exec(sql, vm.VaultName, vm.AssetDecimals, vm.TotalShares, vm.AssetReserve, vm.SupplyCap, vm.MaxDeposit, vm.MinDeposit, vm.ManagementFeeBps, vm.PerformanceFeeBps, vm.VaultId)
