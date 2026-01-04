@@ -22,12 +22,12 @@ func startEventJob() {
 	_, err := c.AddFunc("*/10 * * * * *", func() {
 		fmt.Println("event cron 任务执行：", time.Now().Format("15:04:05.000"))
 		borrowNextCursor := common.QueryEventsCursor(common.ScheduledTaskTypeBorrow)
-		// farmingNextCursor := common.QueryEventsCursor(common.ScheduledTaskTypeFarming)
+		farmingNextCursor := common.QueryEventsCursor(common.ScheduledTaskTypeFarming)
 		logic.RpcApiRequest(borrowNextCursor)
 		logic.RpcRequestScanCreateVault()
 		logic.ScanVaultEvent()
-		// logic.RpcRequestScanCreateFarming(farmingNextCursor)
-		// logic.ScanFarmingEvent()
+		logic.RpcRequestScanCreateFarming(farmingNextCursor)
+		logic.ScanFarmingEvent()
 	})
 	if err != nil {
 		fmt.Println("event添加任务失败：", err)

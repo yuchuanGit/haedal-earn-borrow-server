@@ -18,18 +18,18 @@ import (
 )
 
 const (
-	FarmingPoolCreateEvent         = "::events::FarmingPoolCreateEvent"            // 创建FarmingPool
-	FarmingRewardConfigAddEvent    = "::events::FarmingRewardConfigAddEvent"       //
-	FarmingRewardBankFundEvent     = "::events::FarmingRewardBankFundEvent"        //
-	FarmingRewardBankExtractEvent  = "::events::FarmingRewardBankExtractEvent"     //
-	FarmingRewardConfigUpdateEvent = "::events::FarmingRewardConfigUpdateEvent"    //
-	FarmingPoolPauseEvent          = "::events::FarmingPoolPauseEvent"             //
-	FarmingPoolResumeEvent         = "::events::FarmingPoolResumeEvent"            //
-	FarmingStakeEvent              = "::events::FarmingStakeEvent"                 //
-	FarmingUnstakeEvent            = "::events::FarmingUnstakeEvent"               //
-	FarmingClaimEvent              = "::meta_vault_events::FarmingClaimEvent"      //
-	FarmingRoleUpdateEvent         = "::meta_vault_events::FarmingRoleUpdateEvent" //
-	FarmingMigrateEvent            = "::meta_vault_events::FarmingMigrateEvent"    //
+	FarmingPoolCreateEvent         = "::farming_events::FarmingPoolCreateEvent"         // 创建FarmingPool
+	FarmingRewardConfigAddEvent    = "::farming_events::FarmingRewardConfigAddEvent"    //
+	FarmingRewardBankFundEvent     = "::farming_events::FarmingRewardBankFundEvent"     //
+	FarmingRewardBankExtractEvent  = "::farming_events::FarmingRewardBankExtractEvent"  //
+	FarmingRewardConfigUpdateEvent = "::farming_events::FarmingRewardConfigUpdateEvent" //
+	FarmingPoolPauseEvent          = "::farming_events::FarmingPoolPauseEvent"          //
+	FarmingPoolResumeEvent         = "::farming_events::FarmingPoolResumeEvent"         //
+	FarmingStakeEvent              = "::farming_events::FarmingStakeEvent"              //
+	FarmingUnstakeEvent            = "::farming_events::FarmingUnstakeEvent"            //
+	FarmingClaimEvent              = "::farming_events::FarmingClaimEvent"              //
+	FarmingRoleUpdateEvent         = "::farming_events::FarmingRoleUpdateEvent"         //
+	FarmingMigrateEvent            = "::farming_events::FarmingMigrateEvent"            //
 )
 
 func VaultReallocate() {
@@ -248,7 +248,7 @@ func InsertFarmingPoolCreate(parsedJson map[string]interface{}, digest string, t
 	pool_id := parsedJson["pool_id"].(string)
 	caller := parsedJson["caller"].(string)
 	stake_token_type := parsedJson["stake_token_type"].(map[string]interface{})["name"].(string)
-	model := parsedJson["model"].(string)
+	model := parsedJson["model"]
 	market_id := parsedJson["market_id"].(string)
 	hearn_addr := parsedJson["hearn_addr"].(string)
 	vault_addr := parsedJson["vault_addr"].(string)
