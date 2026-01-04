@@ -11,11 +11,12 @@ import (
 )
 
 const (
-	PackageId       = "0x6674e6da8ca13907d0850c603ccf72a1b5a871c88cacc74716e6712ad19622fb" // 12-29 15:13
-	HEarnObjectId   = "0x9983f652c6d8c429fc168c4783818aa39c6094cd2a1eb642ada38b42bc617b76"
-	OracleObjectId  = "0x2a50bdf645ad98f65dca648431b6adeed700ad38a17c5c0a6ede709fab84e661"
-	FarmingObjectId = "0x2fe8e51aef2aa431c9c34febf51b25fb26568b78698dff3f3563dc75ff5e4852"
+	PackageId       = "0x98d62ae8e092da2885c486f29abaa3886fc4c4c5d6ed97f5fee9d6c62799e821" // 01-04 14:37
+	HEarnObjectId   = "0x110a702ca487e9439cee4e12224e37018baf54b7ba34c800f915eb34d836c9d0"
+	OracleObjectId  = "0x39630b105880029e71c3d4f06a62fb1327aa712c92bbc50078717cd9f618db27"
+	FarmingObjectId = "0x9709ec470abbfc8a7c32ad68c95ee3caf0571204599bf4e997a8e56c7f7f9f11"
 	SuiUserAddress  = "0x438796b44e606f8768c925534ebb87be9ded13cc51a6ddd955e6e40ab85db6f5"
+	SuiUserPrivKey  = "suiprivkey1qzd62m4ww3w7fsxdxph63xcrzfulc0s6pl0df83vlhwgp6kehtvzv4dpm54"
 	// SuiUserAddress    = "0xec731dad64e781caff49561ed2a69e873b0c1977f923786b0b803c2386dfd19a"
 	SuiBlockvisionEnv = "https://sui-testnet-endpoint.blockvision.org"
 	SuiEnv            = "https://fullnode.testnet.sui.io:443"
@@ -57,7 +58,7 @@ func EventRpcRequest(req models.SuiXQueryTransactionBlocksRequest, typeLog strin
 func ExecuteSignAndExecuteTransactionBlock(cli sui.ISuiAPI, ctx context.Context, moduleName string, funcName string, typeArguments []interface{}, arguments []interface{}) []moveCallResult {
 	rsp, err := cli.MoveCall(ctx, models.MoveCallRequest{
 		Signer:          SuiUserAddress, //交易签名人的Sui地址
-		PackageObjectId: "0x6674e6da8ca13907d0850c603ccf72a1b5a871c88cacc74716e6712ad19622fb",
+		PackageObjectId: PackageId,
 		Module:          moduleName,
 		Function:        funcName,
 		TypeArguments:   typeArguments,
@@ -72,7 +73,7 @@ func ExecuteSignAndExecuteTransactionBlock(cli sui.ISuiAPI, ctx context.Context,
 	}
 
 	// signerAccount, err := signer.NewSignertWithMnemonic("mnemonic phrase")
-	signerAccount, err := signer.NewSignerWithSecretKey("suiprivkey1qzd62m4ww3w7fsxdxph63xcrzfulc0s6pl0df83vlhwgp6kehtvzv4dpm54")
+	signerAccount, err := signer.NewSignerWithSecretKey(SuiUserPrivKey)
 	devRs, devErr := cli.SignAndExecuteTransactionBlock(ctx, models.SignAndExecuteTransactionBlockRequest{
 		TxnMetaData: rsp,
 		PriKey:      signerAccount.PriKey,
@@ -85,16 +86,16 @@ func ExecuteSignAndExecuteTransactionBlock(cli sui.ISuiAPI, ctx context.Context,
 		},
 		RequestType: "WaitForLocalExecution"})
 	if devErr != nil {
-		fmt.Printf("SuiDevInspectTransactionBlock查询失败：%v\n", devErr.Error())
+		fmt.Printf("SignAndExecuteTransactionBlock执行失败：%v\n", devErr.Error())
 		return moveCallReturn
 	}
 	if devRs.Effects.Status.Status == "failure" {
-		fmt.Println("SuiDevInspectTransactionBlock Status 失败:", devRs.Effects.Status.Error)
+		fmt.Println("SignAndExecuteTransactionBlock Status 失败:", devRs.Effects.Status.Error)
 		return moveCallReturn
 	}
 	resultsMarshalled, err2 := devRs.Results.MarshalJSON()
 	if err2 != nil {
-		fmt.Println("SuiDevInspectTransactionBlock MarshalJSON 失败:", err2.Error())
+		fmt.Println("SignAndExecuteTransactionBlock MarshalJSON 失败:", err2.Error())
 		return moveCallReturn
 	}
 
