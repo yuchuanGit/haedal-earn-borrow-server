@@ -184,12 +184,107 @@ func ScanFarmingEvent() {
 	jobTasks := common.QueryExecutionInputObjectId(common.ScheduledTaskTypeFarmingPoolId, "ScanFarmingEvent")
 	isFinalTask := false
 	lastIdx := len(jobTasks) - 1
+	var frcs []FarmingRewardConfig
 	for idx, jobTask := range jobTasks {
 		if idx == lastIdx {
 			isFinalTask = true
 		}
 		RpcRequestScanFarmingEvent(jobTask, isFinalTask)
+		poolData := FarmingPoolObjectQuery(jobTask)
+		if len(poolData) > 0 {
+			frcs = append(frcs, poolData...)
+
+		}
 	}
+	FarmingPoolUpdate(frcs)
+}
+
+func FarmingPoolObjectQuery(jobInfo common.ScheduledTaskRecord) []FarmingRewardConfig {
+	suiObjectData := rpcSdk.QuerySuiGetObject(jobInfo.InputObjectId, "FarmingPoolUpdate")
+	var frcs []FarmingRewardConfig
+	if suiObjectData != nil {
+		if suiObjectData.Content != nil {
+			fields := suiObjectData.Content.Fields
+			rewardConfigs := fields["reward_configs"].(map[string]interface{})
+			if rewardConfigs != nil {
+				rewardConfigsFields := rewardConfigs["fields"].(map[string]interface{})
+				if rewardConfigsFields != nil {
+					rewardConfigsFieldsContents := rewardConfigsFields["contents"].([]interface{})
+					if len(rewardConfigsFieldsContents) > 0 {
+						for _, configsContent := range rewardConfigsFieldsContents {
+							var frc FarmingRewardConfig
+							configsContentMap, _ := configsContent.(map[string]interface{})
+							configFields := configsContentMap["fields"].(map[string]interface{})
+							key := configFields["key"].(map[string]interface{})
+							value := configFields["value"].(map[string]interface{})
+							frc.PoolId = jobInfo.InputObjectId
+							frc.RewardTokenType = key["fields"].(map[string]interface{})["name"].(string)
+							frc.RewardBankId = value["fields"].(map[string]interface{})["reward_bank_id"].(string)
+							frc.RewardPerSecond = value["fields"].(map[string]interface{})["reward_per_second"].(string)
+							frc.StartTime = value["fields"].(map[string]interface{})["start_time"].(string)
+							frc.EndTime = value["fields"].(map[string]interface{})["end_time"].(string)
+							frcs = append(frcs, frc)
+						}
+					} else {
+						log.Printf("FarmingPoolUpdate poolId=:%v not reward_configs contents \n", jobInfo.InputObjectId)
+
+					}
+				}
+			}
+		} else {
+			log.Printf("FarmingPoolUpdate SuiGetObject resp.Data.Content:%v\n", suiObjectData.Content)
+		}
+	} else {
+		log.Printf("FarmingPoolUpdate SuiGetObject resp.Data:%v\n", suiObjectData)
+	}
+	return frcs
+}
+
+func FarmingPoolUpdate(frcs []FarmingRewardConfig) {
+	if len(frcs) > 0 {
+		con := mydb.GetDbConnection()
+		_, clearErr := con.Exec("TRUNCATE TABLE farming_reward_config_new")
+		if clearErr != nil {
+			log.Printf("farming_reward_config_new 情况失败: %v", clearErr)
+			defer con.Close()
+			return
+		}
+		insertBase := "insert into farming_reward_config_new(pool_id,reward_bank_id,reward_token_type,reward_per_second,start_time,end_time) VALUES"
+		var insertSql strings.Builder
+		insertSql.WriteString(insertBase)
+		var args []any
+		for i := 0; i < len(frcs); i++ {
+			insertSql.WriteString("(?,?,?,?,?,?)")
+			if i != len(frcs)-1 { // 非最后一行加逗号
+				insertSql.WriteString(",")
+			}
+			args = append(args, frcs[i].PoolId)
+			args = append(args, frcs[i].RewardBankId)
+			args = append(args, frcs[i].RewardTokenType)
+			args = append(args, frcs[i].RewardPerSecond)
+			args = append(args, frcs[i].StartTime)
+			args = append(args, frcs[i].EndTime)
+
+		}
+		result, err := con.Exec(insertSql.String(), args...)
+		if err != nil {
+			log.Printf("farming_reward_config_new 新增失败: %v", err)
+			defer con.Close()
+			return
+		}
+		updateRowCount, _ := result.RowsAffected()
+		log.Printf("farming_reward_config_new updateRowCount=:%d\n", updateRowCount)
+		defer con.Close()
+	}
+}
+
+type FarmingRewardConfig struct {
+	PoolId          string //资金池地址
+	RewardBankId    string // 奖励池ID
+	RewardTokenType string //奖励代币类型
+	RewardPerSecond string // 每秒奖励数量
+	StartTime       string // 奖励开始时间
+	EndTime         string // 奖励结束时间
 }
 
 func RpcRequestScanFarmingEvent(jobInfo common.ScheduledTaskRecord, isFinalTask bool) {

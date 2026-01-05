@@ -22,6 +22,24 @@ const (
 	SuiEnv            = "https://fullnode.testnet.sui.io:443"
 )
 
+func QuerySuiGetObject(objectId string, typeLog string) *models.SuiObjectData {
+	cli := sui.NewSuiClient(SuiEnv)
+	ctx := context.Background()
+	reqParams := models.SuiGetObjectRequest{
+		ObjectId: objectId,
+		Options: models.SuiObjectDataOptions{
+			ShowType:    true,
+			ShowContent: true,
+			ShowBcs:     false,
+		},
+	}
+	resp, err := cli.SuiGetObject(ctx, reqParams)
+	if err != nil {
+		fmt.Printf("%v SuiGetObject err:%v\n", typeLog, err)
+		return nil
+	}
+	return resp.Data
+}
 func SuiTransactionBlockInputParameter(inputObjectId string, nextCursor string) models.SuiXQueryTransactionBlocksRequest {
 	params := models.SuiXQueryTransactionBlocksRequest{
 		SuiTransactionBlockResponseQuery: models.SuiTransactionBlockResponseQuery{
