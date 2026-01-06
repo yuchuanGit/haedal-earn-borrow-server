@@ -12,6 +12,7 @@ const (
 	ScheduledTaskTypeVault         = 2
 	ScheduledTaskTypeFarming       = 3
 	ScheduledTaskTypeFarmingPoolId = 31
+	ScheduledTaskTypeMultiply      = 4
 )
 
 func InsertScheduledTask(con *sql.DB, timingType int, inputObjectId string, operationType string) {

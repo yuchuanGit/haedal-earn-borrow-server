@@ -28,6 +28,8 @@ func startEventJob() {
 		logic.ScanVaultEvent()
 		logic.RpcRequestScanCreateFarming(farmingNextCursor)
 		logic.ScanFarmingEvent()
+		// multiplyNextCursor := common.QueryEventsCursor(common.ScheduledTaskTypeMultiply)
+		// logic.ScanMultiplyEvent(multiplyNextCursor)
 	})
 	if err != nil {
 		fmt.Println("event添加任务失败：", err)
