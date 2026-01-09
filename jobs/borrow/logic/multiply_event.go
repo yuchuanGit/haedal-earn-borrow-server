@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	MultiplyUpdateMarketEvent = "::multiply::MultiplyUpdateMarketEvent" //
-
+	MultiplyUpdateMarketEvent = "::multiply_events::MultiplyUpdateMarketEvent" //
 )
 
 func ScanMultiplyEvent(nextCursor string) {
