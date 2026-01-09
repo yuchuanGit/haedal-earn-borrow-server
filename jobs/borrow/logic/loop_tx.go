@@ -16,18 +16,6 @@ import (
 )
 
 const (
-// PackageId         = "0x3bb6c9ecec37aa47a6b7cc40ddfb014004d6495f6733243e34482838ea956a0e" //12-17 20:47
-// HEarnObjectId     = "0xa125076a0bc69578e7e9f60ba4a96b742604e02f1c3fc2f8994e9a3b37183bba"
-// OracleObjectId    = "0x78f30de7d853e3245f82eafe639c149316e989bb6a33e5b6346c577475f04bf3"
-// PackageId         = "0x74640585be1b236885fe461c18f9a31aedd78cf9444d6af4e63b065940e41cdc" // 12-19 11:15
-// HEarnObjectId     = "0x0a1be2504d6e5a23fea45692558baf0b2f68166448c6f70d80148979c0b10dbb"
-// OracleObjectId    = "0xc745cc48a1e67312e5cc637d9c54a85065a5b718d16a13afb3fbf025b0aed918"
-// PackageId         = "0xa192fea008b04b3627a125c7774de1364a5b4d4e59345f6602be21a5adfc920a" // 12-23 11:25
-// HEarnObjectId     = "0xa4e27805c7bc0587a7907cb20fad95a1925bab4fca022d3337510812d368f0f1"
-// OracleObjectId    = "0x83095db301ef05c51a5868806be87feb530b1ca333652f8adb61cdfbb3c8dceb"
-)
-
-const (
 	CreateMarketEvent            = "::events::CreateMarketEvent"                       // 创建Market
 	SupplyEvent                  = "::events::SupplyEvent"                             // 存数量
 	SupplyCollateralEvent        = "::events::SupplyCollateralEvent"                   // 存抵押
@@ -37,6 +25,7 @@ const (
 	WithdrawCollateralEvent      = "::events::WithdrawCollateralEvent"                 // 取抵押
 	AccrueInterestEvent          = "::events::AccrueInterestEvent"                     // 计利息
 	BorrowRateUpdateEvent        = "::events::BorrowRateUpdateEvent"                   // 借款利率更新
+	LiquidateEvent               = "::events::LiquidateEvent"                          //borrow清算
 	VaultEvent                   = "::meta_vault_events::VaultEvent"                   // 创建Vault
 	SetAllocationEvent           = "::meta_vault_events::SetAllocationEvent"           // 设置Borrow cap
 	SetSupplyQueueEvent          = "::meta_vault_events::SetSupplyQueueEvent"          // 设置存款队列，Vault和Market相关联
@@ -136,10 +125,56 @@ func RpcApiRequest(nextCursor string) {
 				InsertRateDetali(event.ParsedJson, transactions, digest, transactionTime)
 			case BorrowRateUpdateEvent: //	借款利率更新
 				InsertBorrowRateUpdate(event.ParsedJson, digest, transactionTime)
+			case LiquidateEvent: //borrow清算
+				InsertBorrowLiquidate(event.ParsedJson, digest, transactionTime)
 			}
 		}
 	}
 	RpcApiRequest(resp.NextCursor)
+}
+
+func InsertBorrowLiquidate(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
+	market_id := parsedJson["market_id"].(string)
+	caller := parsedJson["caller"].(string)
+	borrower := parsedJson["borrower"].(string)
+	repaid_assets := parsedJson["repaid_assets"].(string)
+	repaid_shares := parsedJson["repaid_shares"].(string)
+	seized_assets := parsedJson["seized_assets"].(string)
+	bad_debt_assets := parsedJson["bad_debt_assets"].(string)
+	bad_debt_shares := parsedJson["bad_debt_shares"].(string)
+	collateral_token_type := parsedJson["collateral_token_type"].(map[string]interface{})["name"].(string)
+	loan_token_type := parsedJson["loan_token_type"].(map[string]interface{})["name"].(string)
+	convRs, convErr := strconv.ParseInt(transactionTimeUnix, 10, 64)
+	if convErr != nil {
+		log.Printf("转换失败：%v\n", convErr)
+	}
+	transactionTime := time.UnixMilli(convRs)
+	con := mydb.GetDbConnection()
+	queryRs, queryErr := con.Query("select * from borrow_liquidate where digest=?", digest)
+	if queryErr != nil {
+		log.Printf("borrow_liquidate查询 digest失败: %v", queryErr)
+		defer con.Close()
+		return
+	}
+	if queryRs.Next() {
+		fmt.Printf("LiquidateEvent digest exist :%v\n", digest)
+		defer queryRs.Close() // 务必关闭结果集
+		defer con.Close()
+		return
+	}
+
+	sql := "insert into borrow_liquidate(market_id, caller, borrower, repaid_assets, repaid_shares,seized_assets, bad_debt_assets, bad_debt_shares, loan_token_type,collateral_token_type, digest, transaction_time_unix, transaction_time) values(?,?,?,?,?,?,?,?,?,?,?,?,?)"
+	result, err := con.Exec(sql, market_id, caller, borrower, repaid_assets, repaid_shares,
+		seized_assets, bad_debt_assets, bad_debt_shares, loan_token_type, collateral_token_type,
+		digest, transactionTimeUnix, transactionTime)
+	if err != nil {
+		log.Printf("borrow_liquidate新增失败: %v", err)
+		defer con.Close()
+		return
+	}
+	lastInsertID, _ := result.LastInsertId()
+	log.Printf("borrow_liquidate新增id：=%v", lastInsertID)
+	defer con.Close() // 程序退出时关闭数据库连接
 }
 
 func InsertBorrowRateUpdate(parsedJson map[string]interface{}, digest string, transactionTimeUnix string) {
